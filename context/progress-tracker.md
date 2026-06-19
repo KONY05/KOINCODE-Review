@@ -18,13 +18,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - Inngest client setup and serve endpoint at `/api/inngest`.
 - Environment variable template (`.env.local`) and validation module (`config/env.ts`).
 - shadcn/ui initialized with base-nova style, button component, and CSS variables.
+- Landing page implemented from Claude Design mockup: split-screen layout with hero (left) and GitHub OAuth login (right). Fonts switched to IBM Plex Sans + JetBrains Mono. Full light/dark mode support via `next-themes` with system preference detection. Custom color palette matching the design (amber accent, cream buttons, muted grays). Theme toggle component added.
 
 ## In Progress
 - None.
 
 ## Next Up
 - Build the onboarding flow (model selection + API key entry after first sign-in).
-- Build the dashboard layout and landing page.
+- Build the dashboard layout (sidebar navigation, header, main content area).
 - Build the repository connection page (list GitHub repos, connect/disconnect).
 - Set up GitHub webhook endpoint to receive PR events.
 - Implement API key encryption/decryption utilities.
