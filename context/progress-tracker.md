@@ -19,6 +19,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Environment variable template (`.env.local`) and validation module (`config/env.ts`).
 - shadcn/ui initialized with base-nova style, button component, and CSS variables.
 - Landing page implemented from Claude Design mockup: split-screen layout with hero (left) and GitHub OAuth login (right). Fonts switched to IBM Plex Sans + JetBrains Mono. Full light/dark mode support via `next-themes` with system preference detection. Custom color palette matching the design (amber accent, cream buttons, muted grays). Theme toggle component added.
+- Clerk webhook (`POST /api/webhooks/clerk`): verifies `svix` signature, handles `user.created` event, inserts user into `users` table with `ON CONFLICT DO NOTHING` for idempotency. Extracts `clerkId`, `email`, `name`, `avatarUrl`, `githubUsername` from the webhook payload.
 
 ## In Progress
 - None.

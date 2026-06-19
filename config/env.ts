@@ -6,7 +6,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string(),
   CLERK_SECRET_KEY: z.string(),
 
-  GITHUB_WEBHOOK_SECRET: z.string(),
+  CLERK_WEBHOOK_SECRET: z.string(),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(), // TODO: REMOVE OPTIONAL WHEN KEY IS PRESENT
 
   ENCRYPTION_KEY: z.string().min(32),
 });
