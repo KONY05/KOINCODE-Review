@@ -4,12 +4,13 @@ import {
   timestamp,
   integer,
   boolean,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
 export const repos = pgTable("repos", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   githubId: integer("github_id").notNull(),

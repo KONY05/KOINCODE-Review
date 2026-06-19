@@ -4,16 +4,17 @@ import {
   timestamp,
   jsonb,
   integer,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { repos } from "./repos";
 import { users } from "./users";
 
 export const reviews = pgTable("reviews", {
-  id: text("id").primaryKey(),
-  repoId: text("repo_id")
+  id: uuid("id").primaryKey().defaultRandom(),
+  repoId: uuid("repo_id")
     .notNull()
     .references(() => repos.id, { onDelete: "cascade" }),
-  userId: text("user_id")
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   prNumber: integer("pr_number").notNull(),
@@ -36,6 +37,10 @@ export interface ReviewComment {
   line: number;
   body: string;
   suggestion?: string;
+  suggestedDiff?: {
+    oldCode: string;
+    newCode: string;
+  };
   status: "pending" | "applied" | "resolved";
   githubCommentId?: number;
 }

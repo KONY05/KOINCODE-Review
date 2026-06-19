@@ -36,9 +36,14 @@
 - Migrations are managed via `drizzle-kit`.
 
 ## API Keys & Secrets
-- Store user API keys encrypted at rest in the database.
+- Encrypt user API keys with AES-256-GCM before storing in the database.
+- Store the encrypted value as a single versioned envelope string: `v{n}:iv:tag:ciphertext`. No separate columns for IV or version.
 - Decrypt only at the moment of use (inside the background job that calls the LLM).
 - Never return decrypted keys to the client. The UI should show only a masked version.
+- Key rotation: bump the version prefix, keep old `ENCRYPTION_KEY_v{n}` values in env during migration, run a re-encryption job, then drop old keys.
+
+## Database IDs
+- All primary keys use `uuid().defaultRandom()` — Postgres generates UUIDs via `gen_random_uuid()`. No application-side ID generation.
 
 ## File Organisation
 - `app/` — Next.js routes, layouts, pages, and API route handlers.
