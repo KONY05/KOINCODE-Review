@@ -9,7 +9,7 @@
 
 ## TypeScript
 - Strict mode is on — no `any`, no `as` casts unless unavoidable (add a comment explaining why).
-- Use `interface` for object shapes, `type` for unions and intersections.
+- Prefer `type` over `interface` for all type definitions (object shapes, unions, intersections).
 - Prefer named exports over default exports (except for Next.js page/layout conventions).
 - Use zod for runtime validation at API boundaries. Infer TypeScript types from zod schemas (`z.infer<typeof schema>`).
 - Return early from functions — avoid deep nesting.

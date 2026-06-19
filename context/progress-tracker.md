@@ -22,7 +22,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Clerk webhook (`POST /api/webhooks/clerk`): verifies `svix` signature, handles `user.created` event, inserts user into `users` table with `ON CONFLICT DO NOTHING` for idempotency. Extracts `clerkId`, `email`, `name`, `avatarUrl`, `githubUsername` from the webhook payload.
 - Collapsible sidebar dashboard layout using shadcn/ui `Sidebar` component: GitHub account card, nav menu (Dashboard, Repositories, Reviews, Settings), user footer with sign-out dropdown. Sticky header with sidebar toggle and breadcrumb. Keyboard shortcut (Cmd+B) to toggle sidebar. Mobile responsive via sheet overlay.
 - Dashboard page: stat cards (Total Repos, Commits, PRs, AI Reviews), contribution activity placeholder, activity overview chart placeholder.
-- Repositories page skeleton: search bar, repo card placeholders with connect/disconnect and external link buttons.
+- Repository page: fetches user repos from GitHub API via Octokit, paginated with infinite scroll (IntersectionObserver), "All" / "Connected" tab toggle (inline with page heading), debounced search (client-side for All tab, server-side for Connected tab), connect/disconnect with optimistic UI, language badges with colored dots, relative timestamps, empty states for each tab/search combo. Server actions in `lib/actions/repos.ts`, GitHub fetching in `lib/github/repos.ts`.
 - Reviews page skeleton: review card placeholders with status badges, code preview areas, and "View on GitHub" buttons.
 - Settings page: API Keys section with "Add Key" button linking to onboarding, key row placeholders, Repository Memory concept card.
 - Onboarding flow (`/onboarding`): 3-step form (provider selection → model selection → API key entry). Supports Anthropic, OpenAI, Google, xAI providers. "Activate Code Reviews" saves encrypted key + marks onboarding complete. "Skip for now" marks onboarding complete without adding a key. Redirects to dashboard on completion.
@@ -33,7 +33,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - None.
 
 ## Next Up
-- Build the repository connection page (list GitHub repos, connect/disconnect).
+- Set up GitHub webhook endpoint to receive PR events.
 - Set up GitHub webhook endpoint to receive PR events.
 - Implement the AI review agent (diff analysis, vector context retrieval, LLM call, comment posting).
 - Set up Pinecone vector store for repo indexing.
