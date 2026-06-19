@@ -162,6 +162,10 @@
   }
 }
 
+.react-activity-calendar__tooltip {
+  font-size: 11px !important;
+}
+
 @keyframes kc-fade {
   from {
     opacity: 0;

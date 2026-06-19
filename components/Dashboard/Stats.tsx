@@ -1,17 +1,60 @@
-import { LucideProps } from "lucide-react";
-import { ForwardRefExoticComponent, RefAttributes } from "react";
+import {
+  GitBranchIcon,
+  GitCommitHorizontalIcon,
+  GitPullRequestIcon,
+  MessageSquareIcon,
+} from "lucide-react";
 
-type StatsType = {
-  label: string;
-  value: string;
-  sub: string;
-  icon: ForwardRefExoticComponent<
-    Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>
-  >;
-  accent: boolean;
-};
+import { MONTH_LABELS } from "@/lib/constants";
+import type { ContributionStats } from "@/lib/github/contributions";
 
-export default function Stats({ stats }: { stats: StatsType[] }) {
+function getYearRange() {
+  const now = new Date();
+  const yearAgo = new Date(now);
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  return `(${MONTH_LABELS[yearAgo.getMonth()]} ${yearAgo.getFullYear()} – ${MONTH_LABELS[now.getMonth()]} ${now.getFullYear()})`;
+}
+
+export default function Stats({ contributionStats }: { contributionStats: ContributionStats | null }) {
+  const range = getYearRange();
+
+  const stats = [
+    {
+      label: "Total Repositories",
+      value: contributionStats
+        ? String(contributionStats.totalRepositoriesContributedTo)
+        : "—",
+      sub: "Contributed to this year",
+      icon: GitBranchIcon,
+      accent: false,
+    },
+    {
+      label: "Total Commits",
+      value: contributionStats
+        ? String(contributionStats.totalCommits)
+        : "—",
+      sub: `In the last year ${range}`,
+      icon: GitCommitHorizontalIcon,
+      accent: false,
+    },
+    {
+      label: "Pull Requests",
+      value: contributionStats
+        ? String(contributionStats.totalPullRequests)
+        : "—",
+      sub: `In the last year ${range}`,
+      icon: GitPullRequestIcon,
+      accent: false,
+    },
+    {
+      label: "AI Reviews",
+      value: "0",
+      sub: "Generated reviews",
+      icon: MessageSquareIcon,
+      accent: true,
+    },
+  ];
+
   return (
     <div className="mt-8 flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
       {stats.map((s) => (

@@ -1,46 +1,14 @@
-import {
-  GitBranchIcon,
-  GitCommitHorizontalIcon,
-  GitPullRequestIcon,
-  MessageSquareIcon,
-} from "lucide-react";
-
 import Stats from "@/components/Dashboard/Stats";
 import GithubActivity from "@/components/Dashboard/GithubActivity";
 import ActivityOverview from "@/components/Dashboard/ActivityOverview";
+import { getGithubToken } from "@/lib/github";
+import { getContributions } from "@/lib/github/contributions";
 
-const stats = [
-  {
-    label: "Total Repositories",
-    value: "—",
-    sub: "Connected repositories",
-    icon: GitBranchIcon,
-    accent: false,
-  },
-  {
-    label: "Total Commits",
-    value: "—",
-    sub: "In the last year",
-    icon: GitCommitHorizontalIcon,
-    accent: false,
-  },
-  {
-    label: "Pull Requests",
-    value: "—",
-    sub: "All time",
-    icon: GitPullRequestIcon,
-    accent: false,
-  },
-  {
-    label: "AI Reviews",
-    value: "—",
-    sub: "Generated reviews",
-    icon: MessageSquareIcon,
-    accent: true,
-  },
-];
+export default async function DashboardPage() {
+  const token = await getGithubToken();
 
-export default function DashboardPage() {
+  const contributions = token ? await getContributions(token) : null;
+
   return (
     <div className="animate-[kc-fade_0.35s_ease_both]">
       <h1 className="text-[34px] font-bold tracking-[-0.02em]">Dashboard</h1>
@@ -48,13 +16,11 @@ export default function DashboardPage() {
         Overview of your coding activity and AI reviews
       </p>
 
-      <Stats stats={stats}/>
+      <Stats contributionStats={contributions?.stats ?? null} />
 
-      {/* Activity placeholder */}
-      <GithubActivity/>
+      <GithubActivity calendar={contributions?.calendar ?? null} />
 
-      {/* Monthly overview placeholder */}
-     <ActivityOverview/>
+      <ActivityOverview monthlyActivity={contributions?.monthlyActivity ?? null} />
     </div>
   );
 }
