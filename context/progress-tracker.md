@@ -3,10 +3,10 @@
 Update this file whenever the current phase, active feature, or implementation state changes.
 
 ## Current Phase
-- Project Setup — core dependencies installed, foundational structure established.
+- Core UI — dashboard layout, onboarding flow, and page skeletons built.
 
 ## Current Goal
-- Build the onboarding flow (model selection + API key entry after first sign-in).
+- Build the repository connection page (list GitHub repos, connect/disconnect).
 
 ## Completed
 - Initial Next.js 16 scaffold with TypeScript, Tailwind CSS 4, and pnpm (Create Next App).
@@ -20,16 +20,21 @@ Update this file whenever the current phase, active feature, or implementation s
 - shadcn/ui initialized with base-nova style, button component, and CSS variables.
 - Landing page implemented from Claude Design mockup: split-screen layout with hero (left) and GitHub OAuth login (right). Fonts switched to IBM Plex Sans + JetBrains Mono. Full light/dark mode support via `next-themes` with system preference detection. Custom color palette matching the design (amber accent, cream buttons, muted grays). Theme toggle component added.
 - Clerk webhook (`POST /api/webhooks/clerk`): verifies `svix` signature, handles `user.created` event, inserts user into `users` table with `ON CONFLICT DO NOTHING` for idempotency. Extracts `clerkId`, `email`, `name`, `avatarUrl`, `githubUsername` from the webhook payload.
+- Collapsible sidebar dashboard layout using shadcn/ui `Sidebar` component: GitHub account card, nav menu (Dashboard, Repositories, Reviews, Settings), user footer with sign-out dropdown. Sticky header with sidebar toggle and breadcrumb. Keyboard shortcut (Cmd+B) to toggle sidebar. Mobile responsive via sheet overlay.
+- Dashboard page: stat cards (Total Repos, Commits, PRs, AI Reviews), contribution activity placeholder, activity overview chart placeholder.
+- Repositories page skeleton: search bar, repo card placeholders with connect/disconnect and external link buttons.
+- Reviews page skeleton: review card placeholders with status badges, code preview areas, and "View on GitHub" buttons.
+- Settings page: API Keys section with "Add Key" button linking to onboarding, key row placeholders, Repository Memory concept card.
+- Onboarding flow (`/onboarding`): 3-step form (provider selection → model selection → API key entry). Supports Anthropic, OpenAI, Google, xAI providers. "Activate Code Reviews" saves encrypted key + marks onboarding complete. "Skip for now" marks onboarding complete without adding a key. Redirects to dashboard on completion.
+- API key encryption/decryption utilities (`lib/crypto.ts`): AES-256-GCM with versioned envelope format (`v1:iv:tag:ciphertext`).
+- Dashboard layout server component checks `hasCompletedOnboarding` flag and redirects to `/onboarding` if not completed.
 
 ## In Progress
 - None.
 
 ## Next Up
-- Build the onboarding flow (model selection + API key entry after first sign-in).
-- Build the dashboard layout (sidebar navigation, header, main content area).
 - Build the repository connection page (list GitHub repos, connect/disconnect).
 - Set up GitHub webhook endpoint to receive PR events.
-- Implement API key encryption/decryption utilities.
 - Implement the AI review agent (diff analysis, vector context retrieval, LLM call, comment posting).
 - Set up Pinecone vector store for repo indexing.
 - Build review history and detail views.
