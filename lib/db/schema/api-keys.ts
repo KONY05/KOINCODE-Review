@@ -4,6 +4,7 @@ import {
   timestamp,
   boolean,
   uuid,
+  unique,
   pgEnum,
 } from "drizzle-orm/pg-core";
 
@@ -18,18 +19,22 @@ export const llmProviderEnum = pgEnum("llm_provider", [
 
 export type LlmProvider = (typeof llmProviderEnum.enumValues)[number];
 
-export const apiKeys = pgTable("api_keys", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  provider: llmProviderEnum("provider").notNull(),
-  model: text("model").notNull(),
-  encryptedKey: text("encrypted_key").notNull(),
-  isDefault: boolean("is_default").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: llmProviderEnum("provider").notNull(),
+    model: text("model").notNull(),
+    encryptedKey: text("encrypted_key").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [unique().on(t.userId, t.provider)]
+);

@@ -11,10 +11,13 @@
     "validate": "pnpm run lint && pnpm run typecheck",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "inngest:dev": "npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.85",
     "@ai-sdk/google": "^3.0.83",
+    "@ai-sdk/openai": "^3.0.73",
     "@base-ui/react": "^1.6.0",
     "@clerk/nextjs": "^7.5.5",
     "@hookform/resolvers": "^5.4.0",
@@ -22,6 +25,7 @@
     "@octokit/graphql": "^9.0.3",
     "@octokit/rest": "^22.0.1",
     "@octokit/webhooks": "^14.2.0",
+    "@openrouter/ai-sdk-provider": "^2.9.1",
     "@pinecone-database/pinecone": "^8.0.0",
     "ai": "^6.0.208",
     "class-variance-authority": "^0.7.1",

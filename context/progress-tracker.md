@@ -6,7 +6,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - AI review pipeline — webhook ingestion, review agent, and comment posting.
 
 ## Current Goal
-- Implement the AI review agent (diff analysis, vector context retrieval, LLM call, comment posting).
+- Build review history and detail views.
 
 ## Completed
 - Initial Next.js 16 scaffold with TypeScript, Tailwind CSS 4, and pnpm (Create Next App).
@@ -29,13 +29,13 @@ Update this file whenever the current phase, active feature, or implementation s
 - API key encryption/decryption utilities (`lib/crypto.ts`): AES-256-GCM with versioned envelope format (`v1:iv:tag:ciphertext`).
 - Dashboard layout server component checks `hasCompletedOnboarding` flag and redirects to `/onboarding` if not completed.
 - Initial indexing on connect: when a repo is connected, an Inngest background job fetches the repo tree (README, config files, top-level source) via GitHub API, generates embeddings via Gemini `text-embedding-004`, and upserts them into Pinecone (namespaced by `repo:{repoId}`). Repos schema extended with `indexingStatus` and `disconnectedAt` columns plus a unique constraint on `(user_id, github_id)`. Disconnect is now a soft-delete (`isActive = false`, `disconnectedAt = now()`). A daily Inngest cron job purges embeddings and DB rows for repos disconnected 30+ days. Reconnecting within the grace period skips re-indexing if embeddings already exist. Vector module created: `lib/vector/client.ts` (Pinecone client), `lib/vector/embeddings.ts` (Gemini embedding generation with chunking), `lib/vector/indexing.ts` (orchestrator). GitHub tree fetcher: `lib/github/tree.ts`. Inngest functions: `lib/inngest/functions.ts` (`index-repo`, `cleanup-disconnected-repos`). New env vars: `PINECONE_API_KEY`, `PINECONE_INDEX`, `GOOGLE_GENERATIVE_AI_API_KEY` (optional in env schema). Embeddings use Vercel AI SDK (`ai` + `@ai-sdk/google`).
-- GitHub webhook endpoint (`POST /api/webhooks/github`): verifies HMAC-SHA256 signature, handles `pull_request` events (`opened` and `synchronize` actions), skips draft PRs, looks up connected repo by `githubId`, creates a `reviews` row with `pending` status, dispatches `pr/review-requested` Inngest event with PR metadata (number, title, URL, head SHA, branches, repo full name). Inngest stub function (`process-review`) registered and logs the event — placeholder for the full review agent pipeline. Webhook auto-installation: `connectRepo` creates a GitHub webhook on the repo and stores the `webhookId`; `disconnectRepo` deletes the webhook and clears `webhookId`. Webhook helpers in `lib/github/webhooks.ts`. New env vars: `APP_URL` (webhook callback base URL), `GITHUB_WEBHOOK_SECRET` (now required).
+- GitHub webhook endpoint (`POST /api/webhooks/github`): verifies HMAC-SHA256 signature, handles `pull_request` events (`opened` and `synchronize` actions), skips draft PRs, looks up connected repo by `githubId`, creates a `reviews` row with `pending` status, dispatches `pr/review-requested` Inngest event with PR metadata (number, title, URL, head SHA, branches, repo full name). Webhook auto-installation: `connectRepo` creates a GitHub webhook on the repo and stores the `webhookId`; `disconnectRepo` deletes the webhook and clears `webhookId`. Webhook helpers in `lib/github/webhooks.ts`. New env vars: `APP_URL` (webhook callback base URL), `GITHUB_WEBHOOK_SECRET` (now required).
+- AI review agent pipeline (`process-review` Inngest function): full end-to-end review pipeline. Loads user config (API key, provider, model) from DB. Retrieves a fresh GitHub token via Clerk Backend API. Fetches PR diff and changed file list (`lib/github/diff.ts`), full file contents at head SHA (`lib/github/files.ts`), and codebase context from Pinecone (`lib/vector/retrieval.ts`). Builds a structured review prompt (`lib/ai/prompts.ts`) and calls the user's LLM via Vercel AI SDK `generateObject()` with Zod schema enforcement (`lib/ai/review.ts`). LLM provider factory (`lib/ai/providers.ts`) supports Anthropic, OpenAI, Google, and OpenRouter. Posts review comments to GitHub as a single PR review using GitHub's suggestion syntax (`lib/github/comments.ts`). Saves parsed comments and summary to the `reviews` table. Incrementally indexes changed files into Pinecone post-review. New dependencies: `@ai-sdk/anthropic`, `@ai-sdk/openai`.
 
 ## In Progress
 - None.
 
 ## Next Up
-- Implement the AI review agent (diff analysis, vector context retrieval, LLM call, comment posting).
 - Build review history and detail views.
 - Implement apply-fix and resolve flows.
 

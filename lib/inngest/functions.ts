@@ -1,12 +1,20 @@
 import { eq, and, lt } from "drizzle-orm";
+import { clerkClient } from "@clerk/nextjs/server";
 
 import { inngest } from "./client";
 import { db } from "@/lib/db";
-import { repos, apiKeys } from "@/lib/db/schema";
+import { repos, apiKeys, users, reviews } from "@/lib/db/schema";
 import { decrypt } from "@/lib/crypto";
 import { fetchRepoTree } from "@/lib/github/tree";
-import { indexRepoFiles } from "@/lib/vector/indexing";
+import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
+import { fetchPRFiles, fetchPRDiff } from "@/lib/github/diff";
+import { fetchChangedFileContents } from "@/lib/github/files";
+import { postReviewComments } from "@/lib/github/comments";
+import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
+import { runReview } from "@/lib/ai/review";
+import type { ReviewComment } from "@/lib/db/schema/reviews";
+import type { LlmProvider } from "@/lib/db/schema/api-keys";
 
 export const indexRepo = inngest.createFunction(
   {
@@ -105,13 +113,232 @@ export const processReview = inngest.createFunction(
     retries: 3,
     triggers: [{ event: "pr/review-requested" }],
   },
-  async ({ event }) => {
-    const { reviewId, repoId, prNumber, repoFullName } = event.data;
+  async ({ event, step }) => {
+    const {
+      reviewId,
+      repoId,
+      userId,
+      prNumber,
+      prTitle,
+      headSha,
+      headBranch,
+      baseBranch,
+      repoFullName,
+    } = event.data;
 
-    console.log(
-      `Review requested: ${repoFullName}#${prNumber} (review=${reviewId}, repo=${repoId})`
-    );
+    const [owner, repoName] = repoFullName.split("/");
 
-    return { status: "stub", reviewId };
+    const config = await step.run("load-config", async () => {
+      const [user] = await db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!user) throw new Error("User not found");
+
+      const [key] = await db
+        .select({
+          encryptedKey: apiKeys.encryptedKey,
+          provider: apiKeys.provider,
+          model: apiKeys.model,
+        })
+        .from(apiKeys)
+        .where(and(eq(apiKeys.userId, userId), eq(apiKeys.isDefault, true)))
+        .limit(1);
+
+      if (!key) {
+        await db
+          .update(reviews)
+          .set({
+            status: "failed",
+            summary: "No API key configured. Add one in Settings.",
+          })
+          .where(eq(reviews.id, reviewId));
+        return null;
+      }
+
+      let googleApiKey: string | undefined;
+      if (key.provider === "google") {
+        googleApiKey = decrypt(key.encryptedKey);
+      } else {
+        const [googleKey] = await db
+          .select({ encryptedKey: apiKeys.encryptedKey })
+          .from(apiKeys)
+          .where(
+            and(eq(apiKeys.userId, userId), eq(apiKeys.provider, "google"))
+          )
+          .limit(1);
+
+        if (googleKey) googleApiKey = decrypt(googleKey.encryptedKey);
+      }
+
+      return {
+        clerkId: user.clerkId,
+        provider: key.provider as LlmProvider,
+        model: key.model,
+        encryptedKey: key.encryptedKey,
+        googleApiKey,
+      };
+    });
+
+    if (!config) return { status: "failed", reason: "no-api-key" };
+
+    await step.run("set-in-progress", async () => {
+      await db
+        .update(reviews)
+        .set({ status: "in_progress" })
+        .where(eq(reviews.id, reviewId));
+    });
+
+    const githubToken = await step.run("get-github-token", async () => {
+      const client = await clerkClient();
+
+      const response = await client.users.getUserOauthAccessToken(
+        config.clerkId,
+        "github"
+      );
+      
+      const token = response.data[0]?.token;
+
+      if (!token) throw new Error("Could not retrieve GitHub token");
+
+      return token;
+    });
+
+    const { prFiles, diff } = await step.run("fetch-diff", async () => {
+      const [files, rawDiff] = await Promise.all([
+        fetchPRFiles(githubToken, owner, repoName, prNumber),
+        
+        fetchPRDiff(githubToken, owner, repoName, prNumber),
+      ]);
+      return { prFiles: files, diff: rawDiff };
+    });
+
+    const fileContentsObj = await step.run("fetch-file-contents", async () => {
+      const reviewableFiles = prFiles
+        .filter((f) => f.status === "added" || f.status === "modified")
+        .map((f) => f.filename);
+
+      const contents = await fetchChangedFileContents(
+        githubToken,
+        owner,
+        repoName,
+        reviewableFiles,
+        headSha
+      );
+
+      return Object.fromEntries(contents);
+    });
+
+    const fileContents = new Map(Object.entries(fileContentsObj));
+
+    const codebaseContext = await step.run("retrieve-context", async () => {
+      try {
+        const query = buildContextQuery(
+          prTitle,
+          prFiles.map((f) => f.filename)
+        );
+        return await retrieveContext(repoId, query, config.googleApiKey);
+      } catch {
+        return [];
+      }
+    });
+
+    const reviewResult = await step.run("run-llm-review", async () => {
+      const apiKey = decrypt(config.encryptedKey);
+
+      return await runReview({
+        provider: config.provider,
+        model: config.model,
+        apiKey,
+        prTitle,
+        headBranch,
+        baseBranch,
+        filesChanged: prFiles.length,
+        codebaseContext,
+        fileContents,
+        diff,
+      });
+    });
+
+    const postedComments = await step.run("post-comments", async () => {
+      const patches = new Map(
+        prFiles
+          .filter((f) => f.patch)
+          .map((f) => [f.filename, f.patch!])
+      );
+
+      try {
+        return await postReviewComments(
+          githubToken,
+          owner,
+          repoName,
+          prNumber,
+          headSha,
+          reviewResult.comments,
+          patches,
+          {
+            summary: reviewResult.summary,
+            walkthrough: reviewResult.walkthrough,
+            diagram: reviewResult.diagram,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to post review comments to GitHub:", error);
+        return [];
+      }
+    });
+
+    await step.run("save-review", async () => {
+      const comments: ReviewComment[] = reviewResult.comments.map(
+        (c, index) => {
+          const posted = postedComments[index];
+          return {
+            path: c.path,
+            line: c.line,
+            body: c.body,
+            suggestion: c.suggestion,
+            status: "pending" as const,
+            githubCommentId: posted?.githubCommentId,
+          };
+        }
+      );
+
+      await db
+        .update(reviews)
+        .set({
+          status: "completed",
+          summary: reviewResult.summary,
+          comments,
+          model: config.model,
+          completedAt: new Date(),
+        })
+        .where(eq(reviews.id, reviewId));
+    });
+
+    await step.run("index-changed-files", async () => {
+      try {
+        const filesToIndex = Array.from(fileContents.entries()).map(
+          ([path, content]) => ({
+            path,
+            content,
+            fileType: "source" as const,
+          })
+        );
+
+        if (filesToIndex.length > 0) {
+          await indexChangedFiles(repoId, filesToIndex, config.googleApiKey);
+        }
+      } catch (error) {
+        console.error("Incremental indexing failed (non-fatal):", error);
+      }
+    });
+
+    return {
+      status: "completed",
+      reviewId,
+      commentsPosted: postedComments.length,
+    };
   }
 );
