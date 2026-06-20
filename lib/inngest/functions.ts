@@ -98,3 +98,20 @@ export const cleanupDisconnectedRepos = inngest.createFunction(
     return { cleaned: staleRepos.length };
   }
 );
+
+export const processReview = inngest.createFunction(
+  {
+    id: "process-review",
+    retries: 3,
+    triggers: [{ event: "pr/review-requested" }],
+  },
+  async ({ event }) => {
+    const { reviewId, repoId, prNumber, repoFullName } = event.data;
+
+    console.log(
+      `Review requested: ${repoFullName}#${prNumber} (review=${reviewId}, repo=${repoId})`
+    );
+
+    return { status: "stub", reviewId };
+  }
+);

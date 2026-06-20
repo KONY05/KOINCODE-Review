@@ -7,6 +7,7 @@ import { repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
 import { getGithubToken } from "@/lib/github";
 import { fetchUserRepos, type GitHubRepo } from "@/lib/github/repos";
+import { createRepoWebhook, deleteRepoWebhook } from "@/lib/github/webhooks";
 import { inngest } from "@/lib/inngest/client";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 
@@ -113,40 +114,58 @@ export async function connectRepo(
     const token = await getGithubToken();
     if (!token) return fail("GitHub token not found");
 
-    const [upserted] = await db
-      .insert(repos)
-      .values({
-        userId: user.id,
-        githubId: repo.githubId,
-        fullName: repo.fullName,
-        name: repo.name,
-        owner: repo.owner,
-        defaultBranch: repo.defaultBranch,
-        isPrivate: repo.isPrivate,
-        isActive: true,
-        indexingStatus: "pending",
-        disconnectedAt: null,
-      })
-      .onConflictDoUpdate({
-        target: [repos.userId, repos.githubId],
-        set: {
-          isActive: true,
-          disconnectedAt: null,
+    const result = await db.transaction(async (tx) => {
+      const [upserted] = await tx
+        .insert(repos)
+        .values({
+          userId: user.id,
+          githubId: repo.githubId,
           fullName: repo.fullName,
           name: repo.name,
+          owner: repo.owner,
           defaultBranch: repo.defaultBranch,
           isPrivate: repo.isPrivate,
-        },
-      })
-      .returning({ id: repos.id, indexingStatus: repos.indexingStatus });
+          isActive: true,
+          indexingStatus: "pending",
+          disconnectedAt: null,
+        })
+        .onConflictDoUpdate({
+          target: [repos.userId, repos.githubId],
+          set: {
+            isActive: true,
+            disconnectedAt: null,
+            fullName: repo.fullName,
+            name: repo.name,
+            defaultBranch: repo.defaultBranch,
+            isPrivate: repo.isPrivate,
+          },
+        })
+        .returning({
+          id: repos.id,
+          indexingStatus: repos.indexingStatus,
+          webhookId: repos.webhookId,
+        });
 
-    const needsIndexing = upserted.indexingStatus !== "completed";
+      if (!upserted.webhookId) {
+        const webhookId = await createRepoWebhook(
+          token,
+          repo.owner,
+          repo.name
+        );
+        await tx
+          .update(repos)
+          .set({ webhookId })
+          .where(eq(repos.id, upserted.id));
+      }
 
-    if (needsIndexing) {
+      return upserted;
+    });
+
+    if (result.indexingStatus !== "completed") {
       await inngest.send({
         name: "repo/connected",
         data: {
-          repoId: upserted.id,
+          repoId: result.id,
           owner: repo.owner,
           name: repo.name,
           defaultBranch: repo.defaultBranch,
@@ -168,9 +187,29 @@ export async function disconnectRepo(
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
 
+    const token = await getGithubToken();
+
+    const [repo] = await db
+      .select({
+        webhookId: repos.webhookId,
+        owner: repos.owner,
+        name: repos.name,
+      })
+      .from(repos)
+      .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)))
+      .limit(1);
+
+    if (repo?.webhookId && token) {
+      try {
+        await deleteRepoWebhook(token, repo.owner, repo.name, repo.webhookId);
+      } catch (e) {
+        console.error("Failed to delete webhook:", e);
+      }
+    }
+
     await db
       .update(repos)
-      .set({ isActive: false, disconnectedAt: new Date() })
+      .set({ isActive: false, disconnectedAt: new Date(), webhookId: null })
       .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)));
 
     return ok(null);

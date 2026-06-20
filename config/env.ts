@@ -8,7 +8,9 @@ const envSchema = z.object({
   CLERK_SECRET_KEY: z.string(),
 
   CLERK_WEBHOOK_SECRET: z.string(),
-  GITHUB_WEBHOOK_SECRET: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string(),
+
+  APP_URL: z.string(),
 
   ENCRYPTION_KEY: z.string().min(32),
 
