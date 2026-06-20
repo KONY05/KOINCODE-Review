@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
 import { KeyIcon, LockIcon, ZapIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
+
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import Logo from "../Logo";
 
@@ -37,17 +38,18 @@ const PROVIDERS = [
   },
 ] as const;
 
-const providerIds = PROVIDERS.map((p) => p.id);
+type ProviderId = (typeof PROVIDERS)[number]["id"];
+
+const providerIds = PROVIDERS.map((p) => p.id) as [ProviderId, ...ProviderId[]];
 const allModels = PROVIDERS.flatMap((p) => p.models);
 
 const onboardingSchema = z.object({
-  provider: z.enum(providerIds as [string, ...string[]]),
+  provider: z.enum(providerIds),
   model: z.enum(allModels as [string, ...string[]]),
   apiKey: z.string().min(5, "API key is too short"),
 });
 
 type OnboardingValues = z.infer<typeof onboardingSchema>;
-type ProviderId = (typeof PROVIDERS)[number]["id"];
 
 export function OnboardingForm() {
   const router = useRouter();

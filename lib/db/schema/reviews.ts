@@ -5,9 +5,17 @@ import {
   jsonb,
   integer,
   uuid,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { repos } from "./repos";
 import { users } from "./users";
+
+export const reviewStatusEnum = pgEnum("review_status", [
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+]);
 
 export const reviews = pgTable("reviews", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -20,11 +28,7 @@ export const reviews = pgTable("reviews", {
   prNumber: integer("pr_number").notNull(),
   prTitle: text("pr_title").notNull(),
   prUrl: text("pr_url").notNull(),
-  status: text("status", {
-    enum: ["pending", "in_progress", "completed", "failed"],
-  })
-    .notNull()
-    .default("pending"),
+  status: reviewStatusEnum("status").notNull().default("pending"),
   summary: text("summary"),
   comments: jsonb("comments").$type<ReviewComment[]>(),
   model: text("model"),

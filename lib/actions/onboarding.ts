@@ -4,14 +4,15 @@ import { eq } from "drizzle-orm";
 
 import { getAuthUser } from "@/lib/actions/auth";
 import { db } from "@/lib/db";
-import { apiKeys, users } from "@/lib/db/schema";
+import { apiKeys, users, LlmProvider } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
 
-interface OnboardingData {
-  provider: string;
+
+type OnboardingData = {
+  provider: LlmProvider;
   model: string;
   apiKey: string;
-}
+};
 
 export async function completeOnboarding(data: OnboardingData | null) {
   const dbUser = await getAuthUser();

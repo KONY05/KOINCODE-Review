@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 
+ // TODO: REMOVE OPTIONAL WHEN KEY IS PRESENT
 const envSchema = z.object({
   DATABASE_URL: z.string(),
 
@@ -7,9 +8,13 @@ const envSchema = z.object({
   CLERK_SECRET_KEY: z.string(),
 
   CLERK_WEBHOOK_SECRET: z.string(),
-  GITHUB_WEBHOOK_SECRET: z.string().optional(), // TODO: REMOVE OPTIONAL WHEN KEY IS PRESENT
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
 
   ENCRYPTION_KEY: z.string().min(32),
+
+  PINECONE_API_KEY: z.string().optional(),
+  PINECONE_INDEX: z.string().optional(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

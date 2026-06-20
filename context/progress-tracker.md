@@ -3,10 +3,10 @@
 Update this file whenever the current phase, active feature, or implementation state changes.
 
 ## Current Phase
-- Core UI — dashboard layout, onboarding flow, and page skeletons built.
+- Background processing — indexing pipeline and vector store integration.
 
 ## Current Goal
-- Build the repository connection page (list GitHub repos, connect/disconnect).
+- Set up GitHub webhook endpoint to receive PR events.
 
 ## Completed
 - Initial Next.js 16 scaffold with TypeScript, Tailwind CSS 4, and pnpm (Create Next App).
@@ -28,15 +28,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - Onboarding flow (`/onboarding`): 3-step form (provider selection → model selection → API key entry). Supports Anthropic, OpenAI, Google, xAI providers. "Activate Code Reviews" saves encrypted key + marks onboarding complete. "Skip for now" marks onboarding complete without adding a key. Redirects to dashboard on completion.
 - API key encryption/decryption utilities (`lib/crypto.ts`): AES-256-GCM with versioned envelope format (`v1:iv:tag:ciphertext`).
 - Dashboard layout server component checks `hasCompletedOnboarding` flag and redirects to `/onboarding` if not completed.
+- Initial indexing on connect: when a repo is connected, an Inngest background job fetches the repo tree (README, config files, top-level source) via GitHub API, generates embeddings via Gemini `text-embedding-004`, and upserts them into Pinecone (namespaced by `repo:{repoId}`). Repos schema extended with `indexingStatus` and `disconnectedAt` columns plus a unique constraint on `(user_id, github_id)`. Disconnect is now a soft-delete (`isActive = false`, `disconnectedAt = now()`). A daily Inngest cron job purges embeddings and DB rows for repos disconnected 30+ days. Reconnecting within the grace period skips re-indexing if embeddings already exist. Vector module created: `lib/vector/client.ts` (Pinecone client), `lib/vector/embeddings.ts` (Gemini embedding generation with chunking), `lib/vector/indexing.ts` (orchestrator). GitHub tree fetcher: `lib/github/tree.ts`. Inngest functions: `lib/inngest/functions.ts` (`index-repo`, `cleanup-disconnected-repos`). New env vars: `PINECONE_API_KEY`, `PINECONE_INDEX`, `GOOGLE_GENERATIVE_AI_API_KEY` (optional in env schema). Embeddings use Vercel AI SDK (`ai` + `@ai-sdk/google`).
 
 ## In Progress
 - None.
 
 ## Next Up
 - Set up GitHub webhook endpoint to receive PR events.
-- Set up GitHub webhook endpoint to receive PR events.
 - Implement the AI review agent (diff analysis, vector context retrieval, LLM call, comment posting).
-- Set up Pinecone vector store for repo indexing.
 - Build review history and detail views.
 - Implement apply-fix and resolve flows.
 

@@ -7,6 +7,7 @@ import { repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
 import { getGithubToken } from "@/lib/github";
 import { fetchUserRepos, type GitHubRepo } from "@/lib/github/repos";
+import { inngest } from "@/lib/inngest/client";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 
 export type RepoWithStatus = GitHubRepo & {
@@ -38,7 +39,7 @@ export async function listGithubRepos(
     const connectedRepos = await db
       .select({ githubId: repos.githubId })
       .from(repos)
-      .where(eq(repos.userId, user.id));
+      .where(and(eq(repos.userId, user.id), eq(repos.isActive, true)));
 
     const connectedIds = new Set(connectedRepos.map((r) => r.githubId));
 
@@ -109,7 +110,10 @@ export async function connectRepo(
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
 
-    await db
+    const token = await getGithubToken();
+    if (!token) return fail("GitHub token not found");
+
+    const [upserted] = await db
       .insert(repos)
       .values({
         userId: user.id,
@@ -119,8 +123,37 @@ export async function connectRepo(
         owner: repo.owner,
         defaultBranch: repo.defaultBranch,
         isPrivate: repo.isPrivate,
+        isActive: true,
+        indexingStatus: "pending",
+        disconnectedAt: null,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [repos.userId, repos.githubId],
+        set: {
+          isActive: true,
+          disconnectedAt: null,
+          fullName: repo.fullName,
+          name: repo.name,
+          defaultBranch: repo.defaultBranch,
+          isPrivate: repo.isPrivate,
+        },
+      })
+      .returning({ id: repos.id, indexingStatus: repos.indexingStatus });
+
+    const needsIndexing = upserted.indexingStatus !== "completed";
+
+    if (needsIndexing) {
+      await inngest.send({
+        name: "repo/connected",
+        data: {
+          repoId: upserted.id,
+          owner: repo.owner,
+          name: repo.name,
+          defaultBranch: repo.defaultBranch,
+          githubToken: token,
+        },
+      });
+    }
 
     return ok(null);
   } catch (e) {
@@ -136,7 +169,8 @@ export async function disconnectRepo(
     if (!user) return fail("Unauthorized");
 
     await db
-      .delete(repos)
+      .update(repos)
+      .set({ isActive: false, disconnectedAt: new Date() })
       .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)));
 
     return ok(null);

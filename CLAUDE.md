@@ -55,7 +55,7 @@ GITHUB_WEBHOOK_SECRET=                # GitHub webhook signing secret
 ENCRYPTION_KEY=                       # AES-256-GCM key for encrypting user API keys at rest (openssl rand -hex 32)
 
 # Embeddings (platform-owned, not user-provided)
-GEMINI_API_KEY=                       # Gemini API key for text-embedding-004 (free tier)
+GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for text-embedding-004 (free tier)
 ```
 
 ## Architecture
