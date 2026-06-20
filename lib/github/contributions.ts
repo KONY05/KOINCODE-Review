@@ -39,20 +39,18 @@ type GraphQLContributionsResponse = {
       totalCommitContributions: number;
       totalPullRequestContributions: number;
       totalRepositoriesWithContributedCommits: number;
-      commitContributionsByRepository: {
-        repository: { name: string };
-        contributions: {
-          nodes: { occurredAt: string }[];
-        };
-      }[];
-      pullRequestContributionsByRepository: {
-        repository: { name: string };
-        contributions: {
-          nodes: { occurredAt: string }[];
-        };
-      }[];
     };
   };
+};
+
+type MonthlyContributionsResponse = {
+  viewer: Record<
+    string,
+    {
+      totalCommitContributions: number;
+      totalPullRequestContributions: number;
+    }
+  >;
 };
 
 const CONTRIBUTIONS_QUERY = `
@@ -72,54 +70,38 @@ const CONTRIBUTIONS_QUERY = `
         totalCommitContributions
         totalPullRequestContributions
         totalRepositoriesWithContributedCommits
-        commitContributionsByRepository(maxRepositories: 100) {
-          repository { name }
-          contributions(first: 100) {
-            nodes { occurredAt }
-          }
-        }
-        pullRequestContributionsByRepository(maxRepositories: 100) {
-          repository { name }
-          contributions(first: 100) {
-            nodes { occurredAt }
-          }
-        }
       }
     }
   }
 `;
 
-function buildMonthlyActivity(
-  data: GraphQLContributionsResponse["viewer"]["contributionsCollection"]
-): MonthlyActivity[] {
-  const monthMap = new Map<string, { commits: number; pullRequests: number }>();
+function getLast6Months(): { month: string; from: string; to: string }[] {
+  const months: { month: string; from: string; to: string }[] = [];
+  const now = new Date();
 
-  for (const repo of data.commitContributionsByRepository) {
-    for (const node of repo.contributions.nodes) {
-      const month = node.occurredAt.slice(0, 7);
-      const entry = monthMap.get(month) ?? { commits: 0, pullRequests: 0 };
-      entry.commits++;
-      monthMap.set(month, entry);
-    }
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const monthNum = d.getMonth();
+    const from = new Date(Date.UTC(year, monthNum, 1)).toISOString();
+    const to = new Date(Date.UTC(year, monthNum + 1, 0, 23, 59, 59)).toISOString();
+    const month = `${year}-${String(monthNum + 1).padStart(2, "0")}`;
+    months.push({ month, from, to });
   }
 
-  for (const repo of data.pullRequestContributionsByRepository) {
-    for (const node of repo.contributions.nodes) {
-      const month = node.occurredAt.slice(0, 7);
-      const entry = monthMap.get(month) ?? { commits: 0, pullRequests: 0 };
-      entry.pullRequests++;
-      monthMap.set(month, entry);
-    }
-  }
+  return months;
+}
 
-  return Array.from(monthMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6)
-    .map(([month, data]) => ({
-      month,
-      commits: data.commits,
-      pullRequests: data.pullRequests,
-    }));
+function buildMonthlyQuery(months: { from: string; to: string }[]): string {
+  const fragments = months.map(
+    (m, i) =>
+      `m${i}: contributionsCollection(from: "${m.from}", to: "${m.to}") {
+        totalCommitContributions
+        totalPullRequestContributions
+      }`
+  );
+
+  return `query { viewer { ${fragments.join("\n")} } }`;
 }
 
 export async function getContributions(token: string) {
@@ -127,7 +109,13 @@ export async function getContributions(token: string) {
     headers: { authorization: `token ${token}` },
   });
 
-  const data = await gql<GraphQLContributionsResponse>(CONTRIBUTIONS_QUERY);
+  const months = getLast6Months();
+
+  const [data, monthlyData] = await Promise.all([
+    gql<GraphQLContributionsResponse>(CONTRIBUTIONS_QUERY),
+    gql<MonthlyContributionsResponse>(buildMonthlyQuery(months)),
+  ]);
+
   const collection = data.viewer.contributionsCollection;
 
   const calendar: ContributionCalendar = collection.contributionCalendar;
@@ -139,7 +127,14 @@ export async function getContributions(token: string) {
       collection.totalRepositoriesWithContributedCommits,
   };
 
-  const monthlyActivity = buildMonthlyActivity(collection);
+  const monthlyActivity: MonthlyActivity[] = months.map((m, i) => {
+    const entry = monthlyData.viewer[`m${i}`];
+    return {
+      month: m.month,
+      commits: entry.totalCommitContributions,
+      pullRequests: entry.totalPullRequestContributions,
+    };
+  });
 
   return { calendar, stats, monthlyActivity };
 }
