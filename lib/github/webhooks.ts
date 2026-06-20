@@ -36,7 +36,7 @@ export async function createRepoWebhook(
       content_type: "json",
       secret: env.GITHUB_WEBHOOK_SECRET,
     },
-    events: ["pull_request"],
+    events: ["pull_request", "pull_request_review_comment"],
     active: true,
   });
 

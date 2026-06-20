@@ -39,7 +39,28 @@ type PullRequestPayload = {
   };
 };
 
+type ReviewCommentPayload = {
+  action: "created" | "edited" | "deleted";
+  comment: {
+    id: number;
+    body: string;
+    html_url: string;
+    in_reply_to_id?: number;
+    user: {
+      login: string;
+    };
+  };
+  pull_request: {
+    number: number;
+  };
+  repository: {
+    id: number;
+    full_name: string;
+  };
+};
+
 const REVIEWABLE_ACTIONS = new Set<PullRequestAction>(["opened", "synchronize"]);
+const SUPPORTED_EVENTS = new Set(["pull_request", "pull_request_review_comment"]);
 
 function verifySignature(payload: string, signature: string | null): boolean {
   if (!signature) return false;
@@ -55,21 +76,7 @@ function verifySignature(payload: string, signature: string | null): boolean {
   );
 }
 
-export async function POST(request: NextRequest) {
-  const event = request.headers.get("x-github-event");
-  if (event !== "pull_request") {
-    return NextResponse.json({ ignored: true });
-  }
-
-  const body = await request.text();
-  const signature = request.headers.get("x-hub-signature-256");
-
-  if (!verifySignature(body, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
-
-  const payload: PullRequestPayload = JSON.parse(body);
-
+async function handlePullRequest(payload: PullRequestPayload) {
   if (!REVIEWABLE_ACTIONS.has(payload.action)) {
     return NextResponse.json({ ignored: true });
   }
@@ -122,4 +129,85 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ reviewId: review.id });
+}
+
+async function handleReviewComment(payload: ReviewCommentPayload) {
+  if (payload.action !== "created") {
+    return NextResponse.json({ ignored: true });
+  }
+
+  if (!payload.comment.in_reply_to_id) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  const [repo] = await db
+    .select({ id: repos.id, userId: repos.userId })
+    .from(repos)
+    .where(
+      and(
+        eq(repos.githubId, payload.repository.id),
+        eq(repos.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (!repo) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  const parentCommentId = payload.comment.in_reply_to_id;
+
+  const completedReviews = await db
+    .select({ id: reviews.id, comments: reviews.comments })
+    .from(reviews)
+    .where(
+      and(
+        eq(reviews.repoId, repo.id),
+        eq(reviews.status, "completed")
+      )
+    );
+
+  const parentComment = completedReviews
+    .flatMap((r) => (r.comments ?? []).map((c) => ({ reviewId: r.id, ...c })))
+    .find((c) => c.githubCommentId === parentCommentId);
+
+  if (!parentComment) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  await inngest.send({
+    name: "comment/reply-received",
+    data: {
+      repoId: repo.id,
+      userId: repo.userId,
+      prNumber: payload.pull_request.number,
+      repoFullName: payload.repository.full_name,
+      originalComment: parentComment.body,
+      userReply: payload.comment.body,
+      replyCommentId: payload.comment.id,
+      sourceUrl: payload.comment.html_url,
+    },
+  });
+
+  return NextResponse.json({ dispatched: true });
+}
+
+export async function POST(request: NextRequest) {
+  const event = request.headers.get("x-github-event");
+  if (!event || !SUPPORTED_EVENTS.has(event)) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  const body = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+
+  if (!verifySignature(body, signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  if (event === "pull_request") {
+    return handlePullRequest(JSON.parse(body));
+  }
+
+  return handleReviewComment(JSON.parse(body));
 }

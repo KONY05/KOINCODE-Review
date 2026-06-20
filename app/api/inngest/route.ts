@@ -4,9 +4,10 @@ import {
   indexRepo,
   cleanupDisconnectedRepos,
   processReview,
+  processCommentReply,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [indexRepo, cleanupDisconnectedRepos, processReview],
+  functions: [indexRepo, cleanupDisconnectedRepos, processReview, processCommentReply],
 });

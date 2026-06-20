@@ -209,3 +209,22 @@ export async function postReviewComments(
 
   return postedComments;
 }
+
+export async function replyToComment(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  inReplyTo: number,
+  body: string
+): Promise<void> {
+  const octokit = new Octokit({ auth: token });
+
+  await octokit.pulls.createReplyForReviewComment({
+    owner,
+    repo,
+    pull_number: prNumber,
+    comment_id: inReplyTo,
+    body,
+  });
+}

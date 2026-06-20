@@ -37,6 +37,7 @@ type RunReviewParams = {
   codebaseContext: { filePath: string; text: string }[];
   fileContents: Map<string, string>;
   diff: string;
+  repoMemories?: string[];
 };
 
 export async function runReview(params: RunReviewParams): Promise<ReviewResponse> {
@@ -50,6 +51,7 @@ export async function runReview(params: RunReviewParams): Promise<ReviewResponse
     codebaseContext: params.codebaseContext,
     fileContents: params.fileContents,
     diff: params.diff,
+    repoMemories: params.repoMemories,
   });
 
   const result = await generateText({

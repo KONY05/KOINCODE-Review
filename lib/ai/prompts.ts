@@ -6,6 +6,7 @@ type PromptParams = {
   codebaseContext: { filePath: string; text: string }[];
   fileContents: Map<string, string>;
   diff: string;
+  repoMemories?: string[];
 };
 
 export const REVIEW_SYSTEM_PROMPT = `You are an expert code reviewer. Review the pull request diff and produce a structured response with four parts:
@@ -44,6 +45,14 @@ export function buildReviewPrompt(params: PromptParams): string {
       `- **Branch:** ${params.headBranch} → ${params.baseBranch}\n` +
       `- **Files changed:** ${params.filesChanged}`
   );
+
+  if (params.repoMemories && params.repoMemories.length > 0) {
+    sections.push(
+      `## Repository Rules (learned from past reviews)\n\n` +
+        `These are conventions and preferences specific to this codebase. Respect them in your review:\n\n` +
+        params.repoMemories.map((rule) => `- ${rule}`).join("\n")
+    );
+  }
 
   if (params.codebaseContext.length > 0) {
     sections.push(

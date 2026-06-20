@@ -1,18 +1,19 @@
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, asc, count } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
 
 import { inngest } from "./client";
 import { db } from "@/lib/db";
-import { repos, apiKeys, users, reviews } from "@/lib/db/schema";
+import { repos, apiKeys, users, reviews, repoMemories } from "@/lib/db/schema";
 import { decrypt } from "@/lib/crypto";
 import { fetchRepoTree } from "@/lib/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
 import { fetchPRFiles, fetchPRDiff } from "@/lib/github/diff";
 import { fetchChangedFileContents } from "@/lib/github/files";
-import { postReviewComments } from "@/lib/github/comments";
+import { postReviewComments, replyToComment } from "@/lib/github/comments";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
+import { extractRule } from "@/lib/ai/memory";
 import type { ReviewComment } from "@/lib/db/schema/reviews";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 
@@ -233,6 +234,18 @@ export const processReview = inngest.createFunction(
 
     const fileContents = new Map(Object.entries(fileContentsObj));
 
+    const memories = await step.run("load-repo-memories", async () => {
+      return await db
+        .select({ rule: repoMemories.rule })
+        .from(repoMemories)
+        .where(
+          and(
+            eq(repoMemories.repoId, repoId),
+            eq(repoMemories.isActive, true)
+          )
+        );
+    });
+
     const codebaseContext = await step.run("retrieve-context", async () => {
       try {
         const query = buildContextQuery(
@@ -259,6 +272,7 @@ export const processReview = inngest.createFunction(
         codebaseContext,
         fileContents,
         diff,
+        repoMemories: memories.map((m) => m.rule),
       });
     });
 
@@ -340,5 +354,163 @@ export const processReview = inngest.createFunction(
       reviewId,
       commentsPosted: postedComments.length,
     };
+  }
+);
+
+const MAX_MEMORIES_PER_REPO = 50;
+
+export const processCommentReply = inngest.createFunction(
+  {
+    id: "process-comment-reply",
+    retries: 3,
+    triggers: [{ event: "comment/reply-received" }],
+  },
+  async ({ event, step }) => {
+    const {
+      repoId,
+      userId,
+      prNumber,
+      repoFullName,
+      originalComment,
+      userReply,
+      replyCommentId,
+      sourceUrl,
+    } = event.data;
+
+    const [owner, repoName] = repoFullName.split("/");
+
+    const config = await step.run("load-config", async () => {
+      const [user] = await db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!user) return null;
+
+      const [key] = await db
+        .select({
+          encryptedKey: apiKeys.encryptedKey,
+          provider: apiKeys.provider,
+          model: apiKeys.model,
+        })
+        .from(apiKeys)
+        .where(and(eq(apiKeys.userId, userId), eq(apiKeys.isDefault, true)))
+        .limit(1);
+
+      if (!key) return null;
+
+      return {
+        clerkId: user.clerkId,
+        provider: key.provider as LlmProvider,
+        model: key.model,
+        encryptedKey: key.encryptedKey,
+      };
+    });
+
+    if (!config) return { status: "skipped", reason: "no-config" };
+
+    const rule = await step.run("extract-rule", async () => {
+      const apiKey = decrypt(config.encryptedKey);
+
+      return await extractRule({
+        provider: config.provider,
+        model: config.model,
+        apiKey,
+        originalComment,
+        userReply,
+      });
+    });
+
+    if (!rule) return { status: "skipped", reason: "not-a-rule" };
+
+    const isDuplicate = await step.run("check-duplicate", async () => {
+      const existing = await db
+        .select({ rule: repoMemories.rule })
+        .from(repoMemories)
+        .where(
+          and(
+            eq(repoMemories.repoId, repoId),
+            eq(repoMemories.isActive, true)
+          )
+        );
+
+      const normalized = rule.toLowerCase().trim();
+      return existing.some((m) => {
+        const existingNormalized = m.rule.toLowerCase().trim();
+        return (
+          existingNormalized === normalized ||
+          existingNormalized.includes(normalized) ||
+          normalized.includes(existingNormalized)
+        );
+      });
+    });
+
+    if (isDuplicate) return { status: "skipped", reason: "duplicate" };
+
+    await step.run("store-memory", async () => {
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(repoMemories)
+        .where(
+          and(
+            eq(repoMemories.repoId, repoId),
+            eq(repoMemories.isActive, true)
+          )
+        );
+
+      if (total >= MAX_MEMORIES_PER_REPO) {
+        const [oldest] = await db
+          .select({ id: repoMemories.id })
+          .from(repoMemories)
+          .where(
+            and(
+              eq(repoMemories.repoId, repoId),
+              eq(repoMemories.isActive, true)
+            )
+          )
+          .orderBy(asc(repoMemories.createdAt))
+          .limit(1);
+
+        if (oldest) {
+          await db
+            .update(repoMemories)
+            .set({ isActive: false })
+            .where(eq(repoMemories.id, oldest.id));
+        }
+      }
+
+      await db.insert(repoMemories).values({
+        repoId,
+        userId,
+        rule,
+        sourceUrl,
+      });
+    });
+
+    await step.run("confirm-on-github", async () => {
+      try {
+        const client = await clerkClient();
+        const response = await client.users.getUserOauthAccessToken(
+          config.clerkId,
+          "github"
+        );
+        const token = response.data[0]?.token;
+        if (!token) return;
+
+        await replyToComment(
+          token,
+          owner,
+          repoName,
+          prNumber,
+          replyCommentId,
+          `Got it — I'll remember: *${rule}*`
+        );
+      } catch (error) {
+        console.error("Failed to post confirmation reply:", error);
+      }
+    });
+
+    return { status: "stored", rule };
   }
 );
