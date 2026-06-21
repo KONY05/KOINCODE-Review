@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ExternalLinkIcon, StarIcon, Loader2Icon } from "lucide-react";
+import Link from "next/link";
 
 import type { RepoWithStatus } from "@/lib/actions/repos";
 import { connectRepo, disconnectRepo } from "@/lib/actions/repos";
@@ -76,14 +77,14 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
         </div>
       </div>
 
-      <a
+      <Link
         href={repo.htmlUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] border border-(--kc-border) text-(--kc-text-muted) transition-colors hover:border-[rgba(255,255,255,0.25)] hover:text-foreground"
       >
         <ExternalLinkIcon className="size-4" />
-      </a>
+      </Link>
 
       <button
         onClick={handleToggle}

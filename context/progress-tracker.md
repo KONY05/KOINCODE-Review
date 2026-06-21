@@ -6,7 +6,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - AI review pipeline — webhook ingestion, review agent, and comment posting.
 
 ## Current Goal
-- Build review history and detail views.
+- Build Settings page "Repository Memory" card.
 
 ## Completed
 - Initial Next.js 16 scaffold with TypeScript, Tailwind CSS 4, and pnpm (Create Next App).
@@ -23,7 +23,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Collapsible sidebar dashboard layout using shadcn/ui `Sidebar` component: GitHub account card, nav menu (Dashboard, Repositories, Reviews, Settings), user footer with sign-out dropdown. Sticky header with sidebar toggle and breadcrumb. Keyboard shortcut (Cmd+B) to toggle sidebar. Mobile responsive via sheet overlay.
 - Dashboard page: stat cards (Total Repos, Commits, PRs, AI Reviews), contribution activity placeholder, activity overview chart placeholder.
 - Repository page: fetches user repos from GitHub API via Octokit, paginated with infinite scroll (IntersectionObserver), "All" / "Connected" tab toggle (inline with page heading), debounced search (client-side for All tab, server-side for Connected tab), connect/disconnect with optimistic UI, language badges with colored dots, relative timestamps, empty states for each tab/search combo. Server actions in `lib/actions/repos.ts`, GitHub fetching in `lib/github/repos.ts`.
-- Reviews page skeleton: review card placeholders with status badges, code preview areas, and "View on GitHub" buttons.
+- Reviews page: fetches reviews from DB with cursor-based infinite scroll (IntersectionObserver), summary stat cards (total, completed, pending, failed), review cards with PR title, repo name, status badge, model, comment count, relative timestamps, review summary preview, and "View on GitHub" link. Server action in `lib/actions/reviews.ts`, client components: `ReviewList` (infinite scroll), `ReviewItem` (data card), `ReviewItemSkeleton` (loading state). Empty state when no reviews exist.
 - Settings page: API Keys section with "Add Key" button linking to onboarding, key row placeholders, Repository Memory concept card.
 - Onboarding flow (`/onboarding`): 3-step form (provider selection → model selection → API key entry). Supports Anthropic, OpenAI, Google, xAI providers. "Activate Code Reviews" saves encrypted key + marks onboarding complete. "Skip for now" marks onboarding complete without adding a key. Redirects to dashboard on completion.
 - API key encryption/decryption utilities (`lib/crypto.ts`): AES-256-GCM with versioned envelope format (`v1:iv:tag:ciphertext`).
@@ -38,10 +38,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - None.
 
 ## Next Up
-- Build review history and detail views.
-- Run `pnpm db:migrate` to create `key_usage_logs` table (done — migration `0005_curly_major_mapleleaf.sql`).
-- Implement apply-fix and resolve flows.
 - Build Settings page "Repository Memory" card (view, toggle, delete, manually add rules).
+- Dashboard page: wire up real stat counts (total repos, PRs, AI reviews) from DB instead of placeholders.
 
 ## Open Questions
 - None.

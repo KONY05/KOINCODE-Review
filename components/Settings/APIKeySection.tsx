@@ -1,4 +1,6 @@
 import { KeyIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
+
 import { Skeleton } from "../ui/skeleton";
 
 export default function APIKeySection() {
@@ -15,13 +17,13 @@ export default function APIKeySection() {
             power reviews.
           </p>
         </div>
-        <a
+        <Link
           href="/onboarding"
           className="flex items-center gap-2 rounded-[10px] bg-(--kc-cream) px-4 py-2.5 text-[13.5px] font-semibold text-(--kc-cream-text) transition-colors hover:bg-(--kc-cream-hover)"
         >
           <PlusIcon className="size-[15px]" />
           Add Key
-        </a>
+        </Link>
       </div>
 
       {/* Key rows placeholder */}

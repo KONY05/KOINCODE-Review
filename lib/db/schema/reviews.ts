@@ -17,6 +17,9 @@ export const reviewStatusEnum = pgEnum("review_status", [
   "failed",
 ]);
 
+export type ReviewStatus = (typeof reviewStatusEnum.enumValues)[number];
+
+
 export const reviews = pgTable("reviews", {
   id: uuid("id").primaryKey().defaultRandom(),
   repoId: uuid("repo_id")
@@ -36,7 +39,7 @@ export const reviews = pgTable("reviews", {
   completedAt: timestamp("completed_at"),
 });
 
-export interface ReviewComment {
+export type ReviewComment = {
   path: string;
   line: number;
   body: string;
