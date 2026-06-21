@@ -27,6 +27,7 @@
     "@octokit/webhooks": "^14.2.0",
     "@openrouter/ai-sdk-provider": "^2.9.1",
     "@pinecone-database/pinecone": "^8.0.0",
+    "@tanstack/react-table": "^8.21.3",
     "ai": "^6.0.208",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

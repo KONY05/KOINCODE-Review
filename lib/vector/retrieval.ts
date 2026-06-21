@@ -16,7 +16,8 @@ export async function retrieveContext(
   googleApiKey?: string,
   topK: number = DEFAULT_TOP_K
 ): Promise<ContextResult[]> {
-  const [queryEmbedding] = await generateEmbeddings([query], googleApiKey);
+  const { embeddings } = await generateEmbeddings([query], googleApiKey);
+  const [queryEmbedding] = embeddings;
   const index = getIndex();
   const namespace = `repo:${repoId}`;
 

@@ -26,6 +26,12 @@ const reviewResponseSchema = z.object({
 
 export type ReviewResponse = z.infer<typeof reviewResponseSchema>;
 
+export type ReviewResult = {
+  response: ReviewResponse;
+  usage: { inputTokens: number; outputTokens: number };
+  durationMs: number;
+};
+
 type RunReviewParams = {
   provider: LlmProvider;
   model: string;
@@ -40,7 +46,7 @@ type RunReviewParams = {
   repoMemories?: string[];
 };
 
-export async function runReview(params: RunReviewParams): Promise<ReviewResponse> {
+export async function runReview(params: RunReviewParams): Promise<ReviewResult> {
   const llmProvider = createLLMProvider(params.provider, params.apiKey);
 
   const userPrompt = buildReviewPrompt({
@@ -54,6 +60,8 @@ export async function runReview(params: RunReviewParams): Promise<ReviewResponse
     repoMemories: params.repoMemories,
   });
 
+  const startTime = Date.now();
+
   const result = await generateText({
     model: llmProvider(params.model),
     output: Output.object({ schema: reviewResponseSchema }),
@@ -62,9 +70,18 @@ export async function runReview(params: RunReviewParams): Promise<ReviewResponse
     maxOutputTokens: 4096,
   });
 
+  const durationMs = Date.now() - startTime;
+
   if (!result.output) {
     throw new Error("LLM returned no structured output");
   }
 
-  return result.output;
+  return {
+    response: result.output,
+    usage: {
+      inputTokens: result.usage?.inputTokens ?? 0,
+      outputTokens: result.usage?.outputTokens ?? 0,
+    },
+    durationMs,
+  };
 }

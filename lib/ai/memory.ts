@@ -18,14 +18,22 @@ Rules:
 - If the reply is not teaching a rule (e.g., just saying "thanks", "fixed", "good catch", or acknowledging the review), return null.
 - If the reply is asking a question rather than stating a preference, return null.`;
 
+export type ExtractRuleResult = {
+  rule: string | null;
+  usage: { inputTokens: number; outputTokens: number };
+  durationMs: number;
+};
+
 export async function extractRule(params: {
   provider: LlmProvider;
   model: string;
   apiKey: string;
   originalComment: string;
   userReply: string;
-}): Promise<string | null> {
+}): Promise<ExtractRuleResult> {
   const llmProvider = createLLMProvider(params.provider, params.apiKey);
+
+  const startTime = Date.now();
 
   const result = await generateText({
     model: llmProvider(params.model),
@@ -37,10 +45,17 @@ export async function extractRule(params: {
     maxOutputTokens: 256,
   });
 
-  if (!result.output) return null;
+  const durationMs = Date.now() - startTime;
+
+  const usage = {
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
+  };
+
+  if (!result.output) return { rule: null, usage, durationMs };
 
   const { rule } = result.output;
-  if (!rule || rule.length > 280) return null;
+  if (!rule || rule.length > 280) return { rule: null, usage, durationMs };
 
-  return rule;
+  return { rule, usage, durationMs };
 }

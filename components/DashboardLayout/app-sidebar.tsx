@@ -6,6 +6,7 @@ import {
   LayoutDashboardIcon,
   GitBranchIcon,
   MessageSquareIcon,
+  ScrollTextIcon,
   SettingsIcon,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Repositories", href: "/repos", icon: GitBranchIcon },
   { title: "Reviews", href: "/reviews", icon: MessageSquareIcon },
+  { title: "Logs", href: "/logs", icon: ScrollTextIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
 ];
 

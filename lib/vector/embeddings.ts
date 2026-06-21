@@ -29,18 +29,32 @@ export function chunkText(text: string): TextChunk[] {
   return chunks;
 }
 
+export type EmbeddingResult = {
+  embeddings: number[][];
+  usage: { tokens: number };
+  durationMs: number;
+};
+
 export async function generateEmbeddings(
   texts: string[],
   apiKey?: string
-): Promise<number[][]> {
+): Promise<EmbeddingResult> {
   const provider = apiKey
     ? createGoogleGenerativeAI({ apiKey })
     : google;
 
-  const { embeddings } = await embedMany({
+  const startTime = Date.now();
+
+  const { embeddings, usage } = await embedMany({
     model: provider.embeddingModel(EMBEDDING_MODEL),
     values: texts,
   });
 
-  return embeddings;
+  const durationMs = Date.now() - startTime;
+
+  return {
+    embeddings,
+    usage: { tokens: usage?.tokens ?? 0 },
+    durationMs,
+  };
 }

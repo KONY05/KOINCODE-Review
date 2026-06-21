@@ -3,7 +3,14 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 import { inngest } from "./client";
 import { db } from "@/lib/db";
-import { repos, apiKeys, users, reviews, repoMemories } from "@/lib/db/schema";
+import {
+  repos,
+  apiKeys,
+  users,
+  reviews,
+  repoMemories,
+  keyUsageLogs,
+} from "@/lib/db/schema";
 import { decrypt } from "@/lib/crypto";
 import { fetchRepoTree } from "@/lib/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
@@ -16,6 +23,30 @@ import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
 import type { ReviewComment } from "@/lib/db/schema/reviews";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
+import type { UsageAction, UsageStatus } from "@/lib/db/schema/key-usage-logs";
+
+
+
+async function logKeyUsage(values: {
+  userId: string;
+  apiKeyId?: string | null;
+  repoId?: string | null;
+  reviewId?: string | null;
+  action: UsageAction;
+  provider: LlmProvider;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  durationMs: number;
+  status: UsageStatus;
+  error?: string | null;
+}) {
+  try {
+    await db.insert(keyUsageLogs).values(values);
+  } catch (err) {
+    console.error("Failed to insert key usage log:", err);
+  }
+}
 
 export const indexRepo = inngest.createFunction(
   {
@@ -33,9 +64,10 @@ export const indexRepo = inngest.createFunction(
       .limit(1);
 
     let googleApiKey: string | undefined;
+    let googleKeyId: string | undefined;
     if (repo) {
       const [userKey] = await db
-        .select({ encryptedKey: apiKeys.encryptedKey })
+        .select({ id: apiKeys.id, encryptedKey: apiKeys.encryptedKey })
         .from(apiKeys)
         .where(
           and(eq(apiKeys.userId, repo.userId), eq(apiKeys.provider, "google"))
@@ -44,6 +76,7 @@ export const indexRepo = inngest.createFunction(
 
       if (userKey) {
         googleApiKey = decrypt(userKey.encryptedKey);
+        googleKeyId = userKey.id;
       }
     }
 
@@ -60,7 +93,22 @@ export const indexRepo = inngest.createFunction(
         defaultBranch
       );
 
-      await indexRepoFiles(repoId, files, googleApiKey);
+      const embeddingUsage = await indexRepoFiles(repoId, files, googleApiKey);
+
+      if (repo && embeddingUsage.totalTokens > 0) {
+        await logKeyUsage({
+          userId: repo.userId,
+          apiKeyId: googleKeyId,
+          repoId,
+          action: "embedding",
+          provider: "google",
+          model: "text-embedding-004",
+          inputTokens: embeddingUsage.totalTokens,
+          outputTokens: 0,
+          durationMs: embeddingUsage.totalDurationMs,
+          status: "success",
+        });
+      }
 
       await db
         .update(repos)
@@ -69,6 +117,22 @@ export const indexRepo = inngest.createFunction(
 
       return { indexed: files.length };
     } catch (error) {
+      if (repo) {
+        await logKeyUsage({
+          userId: repo.userId,
+          apiKeyId: googleKeyId,
+          repoId,
+          action: "embedding",
+          provider: "google",
+          model: "text-embedding-004",
+          inputTokens: 0,
+          outputTokens: 0,
+          durationMs: 0,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+
       await db
         .update(repos)
         .set({ indexingStatus: "failed" })
@@ -140,6 +204,7 @@ export const processReview = inngest.createFunction(
 
       const [key] = await db
         .select({
+          id: apiKeys.id,
           encryptedKey: apiKeys.encryptedKey,
           provider: apiKeys.provider,
           model: apiKeys.model,
@@ -176,6 +241,7 @@ export const processReview = inngest.createFunction(
 
       return {
         clerkId: user.clerkId,
+        apiKeyId: key.id,
         provider: key.provider as LlmProvider,
         model: key.model,
         encryptedKey: key.encryptedKey,
@@ -261,19 +327,53 @@ export const processReview = inngest.createFunction(
     const reviewResult = await step.run("run-llm-review", async () => {
       const apiKey = decrypt(config.encryptedKey);
 
-      return await runReview({
-        provider: config.provider,
-        model: config.model,
-        apiKey,
-        prTitle,
-        headBranch,
-        baseBranch,
-        filesChanged: prFiles.length,
-        codebaseContext,
-        fileContents,
-        diff,
-        repoMemories: memories.map((m) => m.rule),
-      });
+      try {
+        const result = await runReview({
+          provider: config.provider,
+          model: config.model,
+          apiKey,
+          prTitle,
+          headBranch,
+          baseBranch,
+          filesChanged: prFiles.length,
+          codebaseContext,
+          fileContents,
+          diff,
+          repoMemories: memories.map((m) => m.rule),
+        });
+
+        await logKeyUsage({
+          userId,
+          apiKeyId: config.apiKeyId,
+          repoId,
+          reviewId,
+          action: "review",
+          provider: config.provider,
+          model: config.model,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          durationMs: result.durationMs,
+          status: "success",
+        });
+
+        return result.response;
+      } catch (error) {
+        await logKeyUsage({
+          userId,
+          apiKeyId: config.apiKeyId,
+          repoId,
+          reviewId,
+          action: "review",
+          provider: config.provider,
+          model: config.model,
+          inputTokens: 0,
+          outputTokens: 0,
+          durationMs: 0,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
     });
 
     const postedComments = await step.run("post-comments", async () => {
@@ -342,7 +442,27 @@ export const processReview = inngest.createFunction(
         );
 
         if (filesToIndex.length > 0) {
-          await indexChangedFiles(repoId, filesToIndex, config.googleApiKey);
+          const embeddingUsage = await indexChangedFiles(
+            repoId,
+            filesToIndex,
+            config.googleApiKey
+          );
+
+          if (embeddingUsage.totalTokens > 0) {
+            await logKeyUsage({
+              userId,
+              apiKeyId: config.apiKeyId,
+              repoId,
+              reviewId,
+              action: "embedding",
+              provider: "google",
+              model: "text-embedding-004",
+              inputTokens: embeddingUsage.totalTokens,
+              outputTokens: 0,
+              durationMs: embeddingUsage.totalDurationMs,
+              status: "success",
+            });
+          }
         }
       } catch (error) {
         console.error("Incremental indexing failed (non-fatal):", error);
@@ -390,6 +510,7 @@ export const processCommentReply = inngest.createFunction(
 
       const [key] = await db
         .select({
+          id: apiKeys.id,
           encryptedKey: apiKeys.encryptedKey,
           provider: apiKeys.provider,
           model: apiKeys.model,
@@ -402,6 +523,7 @@ export const processCommentReply = inngest.createFunction(
 
       return {
         clerkId: user.clerkId,
+        apiKeyId: key.id,
         provider: key.provider as LlmProvider,
         model: key.model,
         encryptedKey: key.encryptedKey,
@@ -413,13 +535,45 @@ export const processCommentReply = inngest.createFunction(
     const rule = await step.run("extract-rule", async () => {
       const apiKey = decrypt(config.encryptedKey);
 
-      return await extractRule({
-        provider: config.provider,
-        model: config.model,
-        apiKey,
-        originalComment,
-        userReply,
-      });
+      try {
+        const result = await extractRule({
+          provider: config.provider,
+          model: config.model,
+          apiKey,
+          originalComment,
+          userReply,
+        });
+
+        await logKeyUsage({
+          userId,
+          apiKeyId: config.apiKeyId,
+          repoId,
+          action: "memory_extraction",
+          provider: config.provider,
+          model: config.model,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          durationMs: result.durationMs,
+          status: "success",
+        });
+
+        return result.rule;
+      } catch (error) {
+        await logKeyUsage({
+          userId,
+          apiKeyId: config.apiKeyId,
+          repoId,
+          action: "memory_extraction",
+          provider: config.provider,
+          model: config.model,
+          inputTokens: 0,
+          outputTokens: 0,
+          durationMs: 0,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
     });
 
     if (!rule) return { status: "skipped", reason: "not-a-rule" };
