@@ -6,6 +6,7 @@ import { getAuthUser } from "@/lib/actions/auth";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import { db } from "@/lib/db";
 import { apiKeys, keyUsageLogs } from "@/lib/db/schema";
+import { encrypt } from "@/lib/crypto";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 
 export type ApiKeyRow = {
@@ -138,5 +139,36 @@ export async function deleteApiKey(keyId: string): Promise<ActionResult> {
     return ok(null);
   } catch (e) {
     return fail("Failed to delete API key", e);
+  }
+}
+
+export async function addApiKey(data: {
+  provider: LlmProvider;
+  model: string;
+  apiKey: string;
+}): Promise<ActionResult> {
+  try {
+    const dbUser = await getAuthUser();
+    if (!dbUser) return fail("Unauthorized");
+
+    const encryptedKey = encrypt(data.apiKey);
+
+    const existingKeys = await db
+      .select({ id: apiKeys.id })
+      .from(apiKeys)
+      .where(eq(apiKeys.userId, dbUser.id))
+      .limit(1);
+
+    await db.insert(apiKeys).values({
+      userId: dbUser.id,
+      provider: data.provider,
+      model: data.model,
+      encryptedKey,
+      isDefault: existingKeys.length === 0,
+    });
+
+    return ok(null);
+  } catch (e) {
+    return fail("Failed to add API key", e);
   }
 }

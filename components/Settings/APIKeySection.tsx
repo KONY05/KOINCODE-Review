@@ -1,8 +1,8 @@
-import { KeyIcon, PlusIcon } from "lucide-react";
-import Link from "next/link";
+import { KeyIcon } from "lucide-react";
 
 import type { ApiKeyRow } from "@/lib/actions/api-keys";
 import { APIKeyTable } from "./APIKeyTable";
+import { AddKeyModal } from "./AddKeyModal";
 
 export default function APIKeySection({ keys }: { keys: ApiKeyRow[] }) {
 
@@ -19,13 +19,7 @@ export default function APIKeySection({ keys }: { keys: ApiKeyRow[] }) {
             power reviews.
           </p>
         </div>
-        <Link
-          href="/onboarding"
-          className="flex items-center gap-2 rounded-[10px] bg-(--kc-cream) px-4 py-2.5 text-[13.5px] font-semibold text-(--kc-cream-text) transition-colors hover:bg-(--kc-cream-hover)"
-        >
-          <PlusIcon className="size-[15px]" />
-          Add Key
-        </Link>
+        <AddKeyModal />
       </div>
 
       {keys.length > 0 ? (

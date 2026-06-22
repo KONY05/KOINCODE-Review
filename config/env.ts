@@ -14,9 +14,9 @@ const envSchema = z.object({
 
   ENCRYPTION_KEY: z.string().min(32),
 
-  PINECONE_API_KEY: z.string().optional(),
-  PINECONE_INDEX: z.string().optional(),
-  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
+  PINECONE_API_KEY: z.string(),
+  PINECONE_INDEX: z.string(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
 });
 
 export const env = envSchema.parse(process.env);
