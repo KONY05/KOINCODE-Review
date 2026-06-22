@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KOINCODE-Review
+
+An open-source AI-powered code review agent. Connect your GitHub repos, bring your own LLM API key, and get automated reviews with fix suggestions on every pull request.
+
+## Features
+
+- **Automated PR reviews** — AI-generated inline comments posted directly to your pull requests
+- **Code fix suggestions** — actionable diffs you can apply with one click (auto-committed to the branch)
+- **Multi-provider LLM support** — Anthropic, OpenAI, Google, OpenRouter
+- **BYOK (Bring Your Own Key)** — no built-in model hosting, no billing complexity
+- **Repository memory** — teach the reviewer per-repo conventions via PR comment replies or manual rules
+- **Codebase context** — hybrid vector indexing gives the reviewer understanding of your broader codebase
+- **Usage tracking** — monitor API calls, tokens, latency, and errors per key
+- **Encrypted storage** — API keys encrypted with AES-256-GCM at rest, decrypted only at invocation
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+git clone https://github.com/KONY05/KOINCODE-Review.git
+cd KOINCODE-Review
+pnpm install
+cp .env.local.example .env.local  # fill in your keys
+pnpm db:generate
+pnpm db:migrate
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## How It Works
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Sign in with GitHub via Clerk OAuth
+2. Choose an LLM provider and add your API key
+3. Connect repositories — webhooks are installed automatically
+4. Open a PR — a background job fetches the diff, retrieves codebase context, and sends the review prompt to your chosen LLM
+5. Review comments with fix suggestions are posted to the PR
+6. Apply fixes (auto-committed) or resolve them (dismiss)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## License
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)
