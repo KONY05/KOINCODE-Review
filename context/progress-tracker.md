@@ -40,6 +40,9 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Next Up
 - Dashboard page: wire up real stat counts (total repos, PRs, AI reviews) from DB instead of placeholders.
 
+## Recently Completed
+- GitHub Check Runs (Feature 09): `lib/github/checks.ts` with `createCheckRun` and `completeCheckRun` helpers. `processReview` Inngest function restructured — GitHub token is now fetched before the API key check so the Check Run can be created early. Pipeline wrapped in try/catch so the Check Run is always completed (success/neutral/failure), never left stuck in `in_progress`. No-API-key early exit now creates and immediately completes a Check Run with failure conclusion. Requires `checks:write` OAuth scope configured in Clerk Dashboard.
+
 ## Open Questions
 - None.
 
