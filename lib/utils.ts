@@ -33,3 +33,12 @@ export function formatRelativeTime(dateString: string): string {
 
   return `${years}y ago`;
 }
+
+export function formatDate(iso: string | null): string {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

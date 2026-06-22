@@ -28,18 +28,10 @@ import {
   deleteApiKey,
 } from "@/lib/actions/api-keys";
 import type { ApiKeyRow } from "@/lib/actions/api-keys";
+import { formatDate } from "@/lib/utils";
 
 function providerLabel(provider: string) {
   return getProviderConfig(provider as ApiKeyRow["provider"])?.label ?? provider;
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return "Never";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {

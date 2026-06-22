@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { fetchLogs, type LogEntry, type LogsFilter } from "@/lib/actions/logs";
-import { columns } from "./column";
+import { columns } from "./columns";
 
 type RepoOption = { id: string; fullName: string };
 
