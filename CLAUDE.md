@@ -55,7 +55,7 @@ GITHUB_WEBHOOK_SECRET=                # GitHub webhook signing secret
 ENCRYPTION_KEY=                       # AES-256-GCM key for encrypting user API keys at rest (openssl rand -hex 32)
 
 # Embeddings (platform-owned, not user-provided)
-GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for text-embedding-004 (free tier)
+GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for gemini-embedding-2 (free tier)
 ```
 
 ## Architecture
@@ -83,7 +83,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for text-embedding-00
 
 ## Key Design Decisions
 - **BYOK (Bring Your Own Key):** Users provide their own LLM API keys for reviews. No built-in model hosting. This avoids billing complexity and lets users choose any provider.
-- **Embedding model strategy:** If the user has a Google/Gemini API key, use theirs for embeddings (`text-embedding-004`). Otherwise, fall back to the platform-owned Gemini key. Saves platform quota when possible.
+- **Embedding model strategy:** If the user has a Google/Gemini API key, use theirs for embeddings (`gemini-embedding-2`). Otherwise, fall back to the platform-owned Gemini key. Saves platform quota when possible.
 - **Hybrid vector indexing:** Lightweight initial index on connect (tree structure, README, config, top-level source), then incremental full-content indexing as files appear in PRs. Balances context coverage with cost.
 - **Inngest for background jobs:** Event-driven architecture with built-in retries. Reviews are processed async — the webhook endpoint enqueues, the job executes.
 - **Server Components first:** Data fetching happens in Server Components. Client Components are only used when browser APIs or interactivity are required.

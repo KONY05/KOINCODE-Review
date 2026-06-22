@@ -20,7 +20,7 @@ When a user disconnects a repository, embeddings are **not** deleted immediately
    a. Sets `indexingStatus` to `'indexing'`.
    b. Fetches the repo tree via GitHub API (default branch).
    c. Selects lightweight files: READMEs (any depth), config files (package.json, tsconfig, etc.), and the full directory tree structure. No source files.
-   d. Generates embeddings using Gemini `text-embedding-004` (platform key, free tier).
+   d. Generates embeddings using Gemini `gemini-embedding-2` (platform key, free tier).
    e. Upserts vectors into Pinecone, namespaced by `repo:{repoId}`.
    f. Sets `indexingStatus` to `'completed'`.
    g. On failure, sets `indexingStatus` to `'failed'`.
@@ -61,7 +61,7 @@ Add a unique constraint on `(user_id, github_id)` to support `ON CONFLICT DO UPD
 
 ## Embedding Strategy
 
-- **Model:** Gemini `text-embedding-004` (free tier, 768 dimensions).
+- **Model:** Gemini `gemini-embedding-2` (free tier, 3072 dimensions).
 - **Key source:** If the user has a Google API key in `api_keys`, use theirs (decrypted at runtime). Otherwise fall back to the platform-owned `GOOGLE_GENERATIVE_AI_API_KEY` env var (auto-read by Vercel AI SDK).
 - **Chunking:** Each file is one document. Files over 4,000 characters are split into chunks of ~4,000 characters with 200-character overlap.
 - **Metadata per vector:** `repoId`, `filePath`, `fileType` (readme / config / source / tree), `chunkIndex`.

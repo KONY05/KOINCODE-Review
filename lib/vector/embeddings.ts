@@ -1,7 +1,7 @@
 import { embedMany } from "ai";
 import { createGoogleGenerativeAI, google } from "@ai-sdk/google";
 
-const EMBEDDING_MODEL = "text-embedding-004";
+export const EMBEDDING_MODEL = "gemini-embedding-2";
 const MAX_CHUNK_SIZE = 4000;
 const CHUNK_OVERLAP = 200;
 
@@ -48,6 +48,9 @@ export async function generateEmbeddings(
   const { embeddings, usage } = await embedMany({
     model: provider.embeddingModel(EMBEDDING_MODEL),
     values: texts,
+    providerOptions: {
+      google: { outputDimensionality: 768 },
+    },
   });
 
   const durationMs = Date.now() - startTime;

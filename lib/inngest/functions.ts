@@ -24,6 +24,7 @@ import { extractRule } from "@/lib/ai/memory";
 import type { ReviewComment } from "@/lib/db/schema/reviews";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 import type { UsageAction, UsageStatus } from "@/lib/db/schema/key-usage-logs";
+import { EMBEDDING_MODEL } from "../vector/embeddings";
 
 
 
@@ -102,7 +103,7 @@ export const indexRepo = inngest.createFunction(
           repoId,
           action: "embedding",
           provider: "google",
-          model: "text-embedding-004",
+          model: EMBEDDING_MODEL,
           inputTokens: embeddingUsage.totalTokens,
           outputTokens: 0,
           durationMs: embeddingUsage.totalDurationMs,
@@ -124,7 +125,7 @@ export const indexRepo = inngest.createFunction(
           repoId,
           action: "embedding",
           provider: "google",
-          model: "text-embedding-004",
+          model: EMBEDDING_MODEL,
           inputTokens: 0,
           outputTokens: 0,
           durationMs: 0,
@@ -456,7 +457,7 @@ export const processReview = inngest.createFunction(
               reviewId,
               action: "embedding",
               provider: "google",
-              model: "text-embedding-004",
+              model: EMBEDDING_MODEL,
               inputTokens: embeddingUsage.totalTokens,
               outputTokens: 0,
               durationMs: embeddingUsage.totalDurationMs,
