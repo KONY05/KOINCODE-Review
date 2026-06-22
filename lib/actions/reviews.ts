@@ -81,7 +81,7 @@ export async function fetchReviews(
       hasNextPage,
     });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Failed to fetch reviews");
+    return fail("Failed to fetch reviews", e);
   }
 }
 
@@ -119,7 +119,7 @@ export async function fetchReviewsSummary(): Promise<
     return ok(summary);
   } catch (e) {
     return fail(
-      e instanceof Error ? e.message : "Failed to fetch reviews summary"
+      "Failed to fetch reviews summary", e
     );
   }
 }

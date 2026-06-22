@@ -136,7 +136,7 @@ export default function RepoList({
         <RepoTabs activeTab={tab} onTabChange={handleTabChange} />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-8">
         <RepoSearchInput onSearch={handleSearch} />
       </div>
 

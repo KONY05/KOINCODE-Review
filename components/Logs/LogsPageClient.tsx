@@ -52,8 +52,8 @@ export function LogsPageClient({
 
   function handleFilterChange(filter: LogsFilter) {
     startTransition(async () => {
-      const updated = await fetchLogsSummary(filter);
-      setSummary(updated);
+      const result = await fetchLogsSummary(filter);
+      if (result.success) setSummary(result.data);
     });
   }
 

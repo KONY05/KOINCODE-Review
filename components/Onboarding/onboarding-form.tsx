@@ -9,38 +9,11 @@ import { KeyIcon, LockIcon, ZapIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { completeOnboarding } from "@/lib/actions/onboarding";
+import { PROVIDERS } from "@/config/providers";
+import type { LlmProvider } from "@/lib/db/schema/api-keys";
 import Logo from "../Logo";
 
-const PROVIDERS = [
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    tag: "Claude",
-    models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  },
-  {
-    id: "openai",
-    label: "OpenAI",
-    tag: "GPT",
-    models: ["gpt-5.5", "gpt-5-mini", "gpt-5-4"],
-  },
-  {
-    id: "google",
-    label: "Google",
-    tag: "Gemini",
-    models: ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-2.5-pro"],
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    tag: "Multi",
-    models: ["z-ai/glm-5.2", "moonshotai/kimi-k2.7-code", "qwen/qwen3.7-plus", "deepseek/deepseek-v4-pro"],
-  },
-] as const;
-
-type ProviderId = (typeof PROVIDERS)[number]["id"];
-
-const providerIds = PROVIDERS.map((p) => p.id) as [ProviderId, ...ProviderId[]];
+const providerIds = PROVIDERS.map((p) => p.id) as [LlmProvider, ...LlmProvider[]];
 const allModels = PROVIDERS.flatMap((p) => p.models);
 
 const onboardingSchema = z.object({
@@ -76,7 +49,7 @@ export function OnboardingForm() {
   const model = watch("model");
   const currentProvider = PROVIDERS.find((p) => p.id === provider)!;
 
-  function handleProviderSelect(id: ProviderId) {
+  function handleProviderSelect(id: LlmProvider) {
     setValue("provider", id, { shouldValidate: true });
     const prov = PROVIDERS.find((p) => p.id === id)!;
     setValue("model", prov.models[0], { shouldValidate: true });
@@ -84,22 +57,22 @@ export function OnboardingForm() {
 
   function onSubmit(data: OnboardingValues) {
     startTransition(async () => {
-      try {
-        await completeOnboarding(data);
+      const result = await completeOnboarding(data);
+      if (result.success) {
         router.push("/dashboard");
-      } catch {
-        toast.error("Failed to save API key. Please try again.");
+      } else {
+        toast.error(result.error);
       }
     });
   }
 
   function handleSkip() {
     startTransition(async () => {
-      try {
-        await completeOnboarding(null);
+      const result = await completeOnboarding(null);
+      if (result.success) {
         router.push("/dashboard");
-      } catch {
-        toast.error("Something went wrong. Please try again.");
+      } else {
+        toast.error(result.error);
       }
     });
   }

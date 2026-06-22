@@ -8,11 +8,21 @@ import { LogsPageClient } from "../../../components/Logs/LogsPageClient";
 export default async function LogsPage() {
   const defaultFilter = { days: 30 };
 
-  const [{ logs, pageCount }, summary, repoOptions] = await Promise.all([
+  const [logsResult, summaryResult, repoResult] = await Promise.all([
     fetchLogs(defaultFilter),
     fetchLogsSummary(defaultFilter),
     fetchUserRepoOptions(),
   ]);
+
+  const { logs, pageCount } = logsResult.success
+    ? logsResult.data
+    : { logs: [], pageCount: 0 };
+
+  const summary = summaryResult.success
+    ? summaryResult.data
+    : { totalCalls: 0, totalTokens: 0, successRate: 0, avgDurationMs: 0 };
+
+  const repoOptions = repoResult.success ? repoResult.data : [];
 
   return (
     <div className="animate-[kc-fade_0.35s_ease_both]">

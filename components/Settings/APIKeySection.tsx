@@ -1,11 +1,13 @@
 import { KeyIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 
-import { Skeleton } from "../ui/skeleton";
+import type { ApiKeyRow } from "@/lib/actions/api-keys";
+import { APIKeyTable } from "./APIKeyTable";
 
-export default function APIKeySection() {
+export default function APIKeySection({ keys }: { keys: ApiKeyRow[] }) {
+
   return (
-    <div className="rounded-2xl border border-(--kc-border-subtle) bg-card p-7">
+    <div className="mt-8 rounded-2xl border border-(--kc-border-subtle) bg-card p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="flex items-center gap-2.5 text-[18px] font-semibold">
@@ -26,28 +28,13 @@ export default function APIKeySection() {
         </Link>
       </div>
 
-      {/* Key rows placeholder */}
-      <div className="mt-6 flex flex-col gap-3.5">
-        <div className="rounded-[14px] border border-(--kc-border-subtle) bg-(--kc-bg) p-5">
-          <div className="flex items-center gap-3.5">
-            <Skeleton className="size-10 rounded-[11px]" />
-            <div className="min-w-0 flex-1">
-              <Skeleton className="h-4 w-32 rounded" />
-              <Skeleton className="mt-2 h-3 w-48 rounded" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-8 w-20 rounded-lg" />
-              <Skeleton className="size-[34px] rounded-lg" />
-              <Skeleton className="size-[34px] rounded-lg" />
-            </div>
-          </div>
-          <Skeleton className="mt-3.5 h-10 w-full rounded-lg" />
-        </div>
-      </div>
-
-      <p className="mt-5 text-center text-[13px] text-(--kc-text-dim)">
-        No API keys configured yet. Add one to start reviewing PRs.
-      </p>
+      {keys.length > 0 ? (
+        <APIKeyTable keys={keys} />
+      ) : (
+        <p className="mt-5 text-center text-[13px] text-(--kc-text-dim)">
+          No API keys configured yet. Add one to start reviewing PRs.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,7 +1,12 @@
 import { BotIcon } from "lucide-react";
-import APIKeySection from "@/components/Settings/APIKeySection";
 
-export default function SettingsPage() {
+import APIKeySection from "@/components/Settings/APIKeySection";
+import { getApiKeys } from "@/lib/actions/api-keys";
+
+export default async function SettingsPage() {
+  const result = await getApiKeys();
+  const keys = result.success ? result.data : [];
+
   return (
     <div className="animate-[kc-fade_0.35s_ease_both]">
       <h1 className="text-[34px] font-bold tracking-[-0.02em]">Settings</h1>
@@ -10,7 +15,7 @@ export default function SettingsPage() {
       </p>
 
       {/* API Keys section */}
-      <APIKeySection />
+      <APIKeySection keys={keys} />
 
       {/* Repository Memory concept */}
       <div className="mt-6 flex items-start gap-4 rounded-2xl border border-dashed border-(--kc-border) bg-(--kc-bg-alt) p-6">

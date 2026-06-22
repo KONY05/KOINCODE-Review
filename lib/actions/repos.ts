@@ -51,7 +51,7 @@ export async function listGithubRepos(
 
     return ok({ repos: reposWithStatus, hasNextPage });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Failed to fetch repositories");
+    return fail("Failed to fetch repositories", e);
   }
 }
 
@@ -99,7 +99,7 @@ export async function listConnectedRepos(
     return ok({ repos: reposWithStatus, hasNextPage });
   } catch (e) {
     return fail(
-      e instanceof Error ? e.message : "Failed to fetch connected repositories"
+      "Failed to fetch connected repositories", e
     );
   }
 }
@@ -176,7 +176,7 @@ export async function connectRepo(
 
     return ok(null);
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Failed to connect repository");
+    return fail("Failed to connect repository", e);
   }
 }
 
@@ -215,7 +215,7 @@ export async function disconnectRepo(
     return ok(null);
   } catch (e) {
     return fail(
-      e instanceof Error ? e.message : "Failed to disconnect repository"
+      "Failed to disconnect repository", e
     );
   }
 }

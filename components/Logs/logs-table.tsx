@@ -72,8 +72,10 @@ export function LogsTable({
     setPageIndex(page);
     startTransition(async () => {
       const result = await fetchLogs(filter, page);
-      setData(result.logs);
-      setPageCount(result.pageCount);
+      if (result.success) {
+        setData(result.data.logs);
+        setPageCount(result.data.pageCount);
+      }
     });
   }
 
@@ -92,8 +94,10 @@ export function LogsTable({
     setPageIndex(0);
     startTransition(async () => {
       const result = await fetchLogs(next, 0);
-      setData(result.logs);
-      setPageCount(result.pageCount);
+      if (result.success) {
+        setData(result.data.logs);
+        setPageCount(result.data.pageCount);
+      }
       onFilterChange(next);
     });
   }

@@ -3,10 +3,10 @@
 import { eq } from "drizzle-orm";
 
 import { getAuthUser } from "@/lib/actions/auth";
+import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import { db } from "@/lib/db";
 import { apiKeys, users, LlmProvider } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
-
 
 type OnboardingData = {
   provider: LlmProvider;
@@ -14,24 +14,32 @@ type OnboardingData = {
   apiKey: string;
 };
 
-export async function completeOnboarding(data: OnboardingData | null) {
-  const dbUser = await getAuthUser();
-  if (!dbUser) throw new Error("Unauthorized");
+export async function completeOnboarding(
+  data: OnboardingData | null
+): Promise<ActionResult> {
+  try {
+    const dbUser = await getAuthUser();
+    if (!dbUser) return fail("Unauthorized");
 
-  if (data) {
-    const encryptedKey = encrypt(data.apiKey);
+    if (data) {
+      const encryptedKey = encrypt(data.apiKey);
 
-    await db.insert(apiKeys).values({
-      userId: dbUser.id,
-      provider: data.provider,
-      model: data.model,
-      encryptedKey,
-      isDefault: true,
-    });
+      await db.insert(apiKeys).values({
+        userId: dbUser.id,
+        provider: data.provider,
+        model: data.model,
+        encryptedKey,
+        isDefault: true,
+      });
+    }
+
+    await db
+      .update(users)
+      .set({ hasCompletedOnboarding: true })
+      .where(eq(users.id, dbUser.id));
+
+    return ok(null);
+  } catch (e) {
+    return fail("Failed to complete onboarding", e);
   }
-
-  await db
-    .update(users)
-    .set({ hasCompletedOnboarding: true })
-    .where(eq(users.id, dbUser.id));
 }

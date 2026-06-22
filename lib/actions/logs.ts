@@ -5,6 +5,7 @@ import { and, eq, gte, desc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { keyUsageLogs, repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
+import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import type { UsageAction, UsageStatus } from "@/lib/db/schema/key-usage-logs";
 
 export type LogEntry = {
@@ -35,6 +36,12 @@ export type LogsFilter = {
   days?: number;
 };
 
+type LogsData = {
+  logs: LogEntry[];
+  totalCount: number;
+  pageCount: number;
+};
+
 const PAGE_SIZE = 25;
 
 function buildConditions(userId: string, filter: LogsFilter) {
@@ -57,92 +64,117 @@ function buildConditions(userId: string, filter: LogsFilter) {
   return conditions;
 }
 
-export async function fetchLogs(filter: LogsFilter = {}, page: number = 0) {
-  const user = await getAuthUser();
-  if (!user) return { logs: [], totalCount: 0, pageCount: 0 };
+export async function fetchLogs(
+  filter: LogsFilter = {},
+  page: number = 0
+): Promise<ActionResult<LogsData>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) return fail("Unauthorized");
 
-  const conditions = buildConditions(user.id, filter);
+    const conditions = buildConditions(user.id, filter);
 
-  const [{ total }] = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(keyUsageLogs)
-    .where(and(...conditions));
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(keyUsageLogs)
+      .where(and(...conditions));
 
-  const pageCount = Math.ceil(total / PAGE_SIZE);
+    const pageCount = Math.ceil(total / PAGE_SIZE);
 
-  const rows = await db
-    .select({
-      id: keyUsageLogs.id,
-      action: keyUsageLogs.action,
-      provider: keyUsageLogs.provider,
-      model: keyUsageLogs.model,
-      inputTokens: keyUsageLogs.inputTokens,
-      outputTokens: keyUsageLogs.outputTokens,
-      durationMs: keyUsageLogs.durationMs,
-      status: keyUsageLogs.status,
-      error: keyUsageLogs.error,
-      createdAt: keyUsageLogs.createdAt,
-      repoFullName: repos.fullName,
-    })
-    .from(keyUsageLogs)
-    .leftJoin(repos, eq(keyUsageLogs.repoId, repos.id))
-    .where(and(...conditions))
-    .orderBy(desc(keyUsageLogs.createdAt), desc(keyUsageLogs.id))
-    .limit(PAGE_SIZE)
-    .offset(page * PAGE_SIZE);
+    const rows = await db
+      .select({
+        id: keyUsageLogs.id,
+        action: keyUsageLogs.action,
+        provider: keyUsageLogs.provider,
+        model: keyUsageLogs.model,
+        inputTokens: keyUsageLogs.inputTokens,
+        outputTokens: keyUsageLogs.outputTokens,
+        durationMs: keyUsageLogs.durationMs,
+        status: keyUsageLogs.status,
+        error: keyUsageLogs.error,
+        createdAt: keyUsageLogs.createdAt,
+        repoFullName: repos.fullName,
+      })
+      .from(keyUsageLogs)
+      .leftJoin(repos, eq(keyUsageLogs.repoId, repos.id))
+      .where(and(...conditions))
+      .orderBy(desc(keyUsageLogs.createdAt), desc(keyUsageLogs.id))
+      .limit(PAGE_SIZE)
+      .offset(page * PAGE_SIZE);
 
-  const logs: LogEntry[] = rows.map((r) => ({
-    id: r.id,
-    action: r.action,
-    provider: r.provider,
-    model: r.model,
-    inputTokens: r.inputTokens,
-    outputTokens: r.outputTokens,
-    durationMs: r.durationMs,
-    status: r.status,
-    error: r.error,
-    createdAt: r.createdAt.toISOString(),
-    repoFullName: r.repoFullName,
-  }));
+    const logs: LogEntry[] = rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      provider: r.provider,
+      model: r.model,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      durationMs: r.durationMs,
+      status: r.status,
+      error: r.error,
+      createdAt: r.createdAt.toISOString(),
+      repoFullName: r.repoFullName,
+    }));
 
-  return { logs, totalCount: total, pageCount };
+    return ok({ logs, totalCount: total, pageCount });
+  } catch (e) {
+    return fail("Failed to fetch logs", e);
+  }
 }
 
-export async function fetchLogsSummary(filter: LogsFilter = {}) {
-  const user = await getAuthUser();
-  if (!user)
-    return { totalCalls: 0, totalTokens: 0, successRate: 0, avgDurationMs: 0 };
+export async function fetchLogsSummary(
+  filter: LogsFilter = {}
+): Promise<ActionResult<LogsSummary>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) return fail("Unauthorized");
 
-  const conditions = buildConditions(user.id, filter);
+    const conditions = buildConditions(user.id, filter);
 
-  const [result] = await db
-    .select({
-      totalCalls: sql<number>`count(*)::int`,
-      totalTokens: sql<number>`coalesce(sum(${keyUsageLogs.inputTokens} + ${keyUsageLogs.outputTokens}), 0)::int`,
-      successCount: sql<number>`count(*) filter (where ${keyUsageLogs.status} = 'success')::int`,
-      avgDurationMs: sql<number>`coalesce(avg(${keyUsageLogs.durationMs}), 0)::int`,
-    })
-    .from(keyUsageLogs)
-    .where(and(...conditions));
+    const [result] = await db
+      .select({
+        totalCalls: sql<number>`count(*)::int`,
+        totalTokens: sql<number>`coalesce(sum(${keyUsageLogs.inputTokens} + ${keyUsageLogs.outputTokens}), 0)::int`,
+        successCount: sql<number>`count(*) filter (where ${keyUsageLogs.status} = 'success')::int`,
+        avgDurationMs: sql<number>`coalesce(avg(${keyUsageLogs.durationMs}), 0)::int`,
+      })
+      .from(keyUsageLogs)
+      .where(and(...conditions));
 
-  return {
-    totalCalls: result.totalCalls,
-    totalTokens: result.totalTokens,
-    successRate:
-      result.totalCalls > 0
-        ? Math.round((result.successCount / result.totalCalls) * 100)
-        : 0,
-    avgDurationMs: result.avgDurationMs,
-  };
+    return ok({
+      totalCalls: result.totalCalls,
+      totalTokens: result.totalTokens,
+      successRate:
+        result.totalCalls > 0
+          ? Math.round((result.successCount / result.totalCalls) * 100)
+          : 0,
+      avgDurationMs: result.avgDurationMs,
+    });
+  } catch (e) {
+    return fail("Failed to fetch logs summary", e);
+  }
 }
 
-export async function fetchUserRepoOptions() {
-  const user = await getAuthUser();
-  if (!user) return [];
+type RepoOption = {
+  id: string;
+  fullName: string;
+};
 
-  return await db
-    .select({ id: repos.id, fullName: repos.fullName })
-    .from(repos)
-    .where(and(eq(repos.userId, user.id), eq(repos.isActive, true)))
-    .orderBy(repos.fullName);
+export async function fetchUserRepoOptions(): Promise<
+  ActionResult<RepoOption[]>
+> {
+  try {
+    const user = await getAuthUser();
+    if (!user) return fail("Unauthorized");
+
+    const options = await db
+      .select({ id: repos.id, fullName: repos.fullName })
+      .from(repos)
+      .where(and(eq(repos.userId, user.id), eq(repos.isActive, true)))
+      .orderBy(repos.fullName);
+
+    return ok(options);
+  } catch (e) {
+    return fail("Failed to fetch repo options", e);
+  }
 }
