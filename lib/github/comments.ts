@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 type ReviewComment = {
   path: string;
+  startLine?: number;
   line: number;
   body: string;
   suggestion?: string;
@@ -158,7 +159,10 @@ export async function postReviewComments(
 
   const reviewComments: {
     path: string;
-    position: number;
+    line: number;
+    start_line?: number;
+    side: "RIGHT";
+    start_side?: "RIGHT";
     body: string;
   }[] = [];
 
@@ -169,11 +173,22 @@ export async function postReviewComments(
     const position = mapDiffLineToPosition(patch, comment.line);
     if (!position) continue;
 
-    reviewComments.push({
+    const entry: (typeof reviewComments)[number] = {
       path: comment.path,
-      position,
+      line: comment.line,
+      side: "RIGHT" as const,
       body: formatCommentBody(comment),
-    });
+    };
+
+    if (comment.startLine && comment.startLine < comment.line) {
+      const startPosition = mapDiffLineToPosition(patch, comment.startLine);
+      if (startPosition) {
+        entry.start_line = comment.startLine;
+        entry.start_side = "RIGHT" as const;
+      }
+    }
+
+    reviewComments.push(entry);
   }
 
   const body = buildReviewBody(reviewSummary, reviewComments.length);

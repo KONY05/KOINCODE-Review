@@ -31,46 +31,31 @@ export async function indexRepoFiles(
   let totalTokens = 0;
   let totalDurationMs = 0;
 
-  const allChunks: {
-    text: string;
-    filePath: string;
-    fileType: string;
-    chunkIndex: number;
-  }[] = [];
-
   for (const file of files) {
     const chunks = chunkText(file.content);
-    for (const chunk of chunks) {
-      allChunks.push({
-        text: chunk.text,
-        filePath: file.path,
-        fileType: file.fileType,
-        chunkIndex: chunk.chunkIndex,
-      });
+
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE);
+      const texts = batch.map((c) => c.text);
+      const result = await generateEmbeddings(texts, googleApiKey);
+
+      totalTokens += result.usage.tokens;
+      totalDurationMs += result.durationMs;
+
+      const vectors: VectorRecord[] = batch.map((chunk, j) => ({
+        id: `${repoId}:${file.path}:${chunk.chunkIndex}`,
+        values: result.embeddings[j],
+        metadata: {
+          repoId,
+          filePath: file.path,
+          fileType: file.fileType,
+          chunkIndex: chunk.chunkIndex,
+          text: chunk.text,
+        },
+      }));
+
+      await index.namespace(namespace).upsert({ records: vectors });
     }
-  }
-
-  for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
-    const batch = allChunks.slice(i, i + BATCH_SIZE);
-    const texts = batch.map((c) => c.text);
-    const result = await generateEmbeddings(texts, googleApiKey);
-
-    totalTokens += result.usage.tokens;
-    totalDurationMs += result.durationMs;
-
-    const vectors: VectorRecord[] = batch.map((chunk, j) => ({
-      id: `${repoId}:${chunk.filePath}:${chunk.chunkIndex}`,
-      values: result.embeddings[j],
-      metadata: {
-        repoId,
-        filePath: chunk.filePath,
-        fileType: chunk.fileType,
-        chunkIndex: chunk.chunkIndex,
-        text: chunk.text,
-      },
-    }));
-
-    await index.namespace(namespace).upsert({ records: vectors });
   }
 
   return { totalTokens, totalDurationMs };
@@ -85,7 +70,7 @@ export async function indexChangedFiles(
 
   const filePaths = [...new Set(files.map((f) => f.path))];
   await Promise.all(
-    filePaths.map((path) => deleteByFilePath(namespace, path))
+    filePaths.map((path) => deleteByFilePath(namespace, repoId, path))
   );
 
   return await indexRepoFiles(repoId, files, googleApiKey);

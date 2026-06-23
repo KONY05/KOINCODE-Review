@@ -28,13 +28,23 @@ Review the diff for:
 - **Code quality** — unclear naming, duplicated logic, overly complex control flow.
 
 Rules for inline comments:
-- Be specific and actionable. Reference exact line numbers and variable names.
+- Be specific and actionable. Reference exact variable names and the surrounding context (e.g., "Inside the \`toggleTodo\` function…", "In the \`useEffect\` that fetches user data…", "Within the \`handleSubmit\` callback…"). The reader should immediately know WHERE in the file the issue lives without opening it.
 - For each issue, provide a suggested code fix when possible.
 - Skip trivial style nits (formatting, semicolons, trailing commas) — linters handle those.
 - Skip praise — only report issues that need attention.
 - If the code looks good and has no issues, return an empty comments array.
-- The "line" field must be a line number in the NEW version of the file (the + side of the diff).
-- The "suggestion" field should contain the replacement code for the problematic line(s). Only include the code itself, not diff markers.`;
+
+Line targeting (CRITICAL — wrong lines will corrupt the code when the suggestion is applied):
+- Use the "Full File Contents" section to find the exact line numbers. Count from line 1.
+- "startLine" and "line" must point to the actual problematic code, NEVER to a surrounding function/class/block declaration. For example, if the bug is \`todos.splice(index, 1)\` on line 45 inside \`deleteTodo\`, target line 45, not the \`function deleteTodo\` line.
+- "startLine" is the FIRST line of the problematic range. "line" is the LAST line. For single-line issues, omit "startLine".
+- Each comment must target code from ONE function/block. Never combine issues from different functions into a single comment.
+
+Suggestion rules (CRITICAL — the suggestion replaces lines startLine..line verbatim):
+- The "suggestion" field must contain the COMPLETE replacement for ALL lines from startLine through line (inclusive). The suggestion is applied by deleting those lines and inserting the suggestion text in their place.
+- Verify: if you mentally delete lines startLine..line from the file and paste the suggestion, the result must be valid code with correct indentation. No orphaned closing braces, no missing function signatures, no leftover old code.
+- Only include the replacement code itself. No diff markers, no line numbers, no markdown.
+- Match the existing indentation of the code being replaced.`;
 
 export function buildReviewPrompt(params: PromptParams): string {
   const sections: string[] = [];
@@ -66,10 +76,16 @@ export function buildReviewPrompt(params: PromptParams): string {
   if (params.fileContents.size > 0) {
     const fileEntries: string[] = [];
     for (const [path, content] of params.fileContents) {
-      fileEntries.push(`### ${path}\n\`\`\`\n${content}\n\`\`\``);
+      const numbered = content
+        .split("\n")
+        .map((line, i) => `${i + 1}\t${line}`)
+        .join("\n");
+      fileEntries.push(`### ${path}\n\`\`\`\n${numbered}\n\`\`\``);
     }
     sections.push(
-      `## Full File Contents (changed files)\n\n` + fileEntries.join("\n\n")
+      `## Full File Contents (changed files, with line numbers)\n\n` +
+        `Use these line numbers for the "startLine" and "line" fields in your comments.\n\n` +
+        fileEntries.join("\n\n")
     );
   }
 

@@ -16,9 +16,9 @@ import { fetchRepoTree } from "@/lib/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
 import { fetchPRFiles, fetchPRDiff } from "@/lib/github/diff";
-import { fetchChangedFileContents } from "@/lib/github/files";
+import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
 import { postReviewComments, replyToComment } from "@/lib/github/comments";
-import { createCheckRun, completeCheckRun } from "@/lib/github/checks";
+import { createCommitStatus } from "@/lib/github/checks";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
@@ -222,8 +222,11 @@ export const processReview = inngest.createFunction(
       return token;
     });
 
-    const checkRunId = await step.run("create-check-run", async () => {
-      return await createCheckRun(githubToken, owner, repoName, headSha);
+    await step.run("set-commit-status-pending", async () => {
+      await createCommitStatus(githubToken, owner, repoName, headSha, {
+        state: "pending",
+        description: "Review in progress...",
+      });
     });
 
     const config = await step.run("load-config", async () => {
@@ -240,9 +243,9 @@ export const processReview = inngest.createFunction(
 
       if (!key) return null;
 
-      let googleApiKey: string | undefined;
+      let googleEncryptedKey: string | undefined;
       if (key.provider === "google") {
-        googleApiKey = decrypt(key.encryptedKey);
+        googleEncryptedKey = key.encryptedKey;
       } else {
         const [googleKey] = await db
           .select({ encryptedKey: apiKeys.encryptedKey })
@@ -252,7 +255,7 @@ export const processReview = inngest.createFunction(
           )
           .limit(1);
 
-        if (googleKey) googleApiKey = decrypt(googleKey.encryptedKey);
+        if (googleKey) googleEncryptedKey = googleKey.encryptedKey;
       }
 
       return {
@@ -260,7 +263,7 @@ export const processReview = inngest.createFunction(
         provider: key.provider as LlmProvider,
         model: key.model,
         encryptedKey: key.encryptedKey,
-        googleApiKey,
+        googleEncryptedKey,
       };
     });
 
@@ -274,11 +277,9 @@ export const processReview = inngest.createFunction(
           })
           .where(eq(reviews.id, reviewId));
 
-        await completeCheckRun(githubToken, owner, repoName, checkRunId, {
-          conclusion: "failure",
-          title: "Review skipped — no API key",
-          summary:
-            "**KoinCode** could not review this PR because no API key is configured.\n\nAdd one in [Settings](/dashboard/settings).",
+        await createCommitStatus(githubToken, owner, repoName, headSha, {
+          state: "failure",
+          description: "No API key configured. Add one in Settings.",
         });
       });
 
@@ -293,37 +294,25 @@ export const processReview = inngest.createFunction(
           .where(eq(reviews.id, reviewId));
       });
 
-      const { prFiles, diff } = await step.run("fetch-diff", async () => {
-        const [files, rawDiff] = await Promise.all([
+      const reviewData = await step.run("run-review", async () => {
+        const [prFiles, diff] = await Promise.all([
           fetchPRFiles(githubToken, owner, repoName, prNumber),
           fetchPRDiff(githubToken, owner, repoName, prNumber),
         ]);
-        return { prFiles: files, diff: rawDiff };
-      });
 
-      const fileContentsObj = await step.run(
-        "fetch-file-contents",
-        async () => {
-          const reviewableFiles = prFiles
-            .filter((f) => f.status === "added" || f.status === "modified")
-            .map((f) => f.filename);
+        const reviewableFiles = prFiles
+          .filter((f) => f.status === "added" || f.status === "modified")
+          .map((f) => f.filename);
 
-          const contents = await fetchChangedFileContents(
-            githubToken,
-            owner,
-            repoName,
-            reviewableFiles,
-            headSha
-          );
+        const fileContents = await fetchChangedFileContents(
+          githubToken,
+          owner,
+          repoName,
+          reviewableFiles,
+          headSha
+        );
 
-          return Object.fromEntries(contents);
-        }
-      );
-
-      const fileContents = new Map(Object.entries(fileContentsObj));
-
-      const memories = await step.run("load-repo-memories", async () => {
-        return await db
+        const memories = await db
           .select({ rule: repoMemories.rule })
           .from(repoMemories)
           .where(
@@ -332,21 +321,25 @@ export const processReview = inngest.createFunction(
               eq(repoMemories.isActive, true)
             )
           );
-      });
 
-      const codebaseContext = await step.run("retrieve-context", async () => {
+        let codebaseContext: { filePath: string; text: string }[] = [];
         try {
           const query = buildContextQuery(
             prTitle,
             prFiles.map((f) => f.filename)
           );
-          return await retrieveContext(repoId, query, config.googleApiKey);
+          const googleApiKey = config.googleEncryptedKey
+            ? decrypt(config.googleEncryptedKey)
+            : undefined;
+          codebaseContext = await retrieveContext(
+            repoId,
+            query,
+            googleApiKey
+          );
         } catch {
-          return [];
+          // non-fatal
         }
-      });
 
-      const reviewResult = await step.run("run-llm-review", async () => {
         const apiKey = decrypt(config.encryptedKey);
 
         try {
@@ -359,7 +352,7 @@ export const processReview = inngest.createFunction(
             baseBranch,
             filesChanged: prFiles.length,
             codebaseContext,
-            fileContents,
+            fileContents: new Map(fileContents),
             diff,
             repoMemories: memories.map((m) => m.rule),
           });
@@ -378,7 +371,17 @@ export const processReview = inngest.createFunction(
             status: "success",
           });
 
-          return result.response;
+          const patches = Object.fromEntries(
+            prFiles
+              .filter((f) => f.patch)
+              .map((f) => [f.filename, f.patch!])
+          );
+
+          return {
+            response: result.response,
+            patches,
+            reviewedFiles: reviewableFiles,
+          };
         } catch (error) {
           await logKeyUsage({
             userId,
@@ -399,11 +402,7 @@ export const processReview = inngest.createFunction(
       });
 
       const postedComments = await step.run("post-comments", async () => {
-        const patches = new Map(
-          prFiles
-            .filter((f) => f.patch)
-            .map((f) => [f.filename, f.patch!])
-        );
+        const patches = new Map(Object.entries(reviewData.patches));
 
         try {
           return await postReviewComments(
@@ -412,12 +411,12 @@ export const processReview = inngest.createFunction(
             repoName,
             prNumber,
             headSha,
-            reviewResult.comments,
+            reviewData.response.comments,
             patches,
             {
-              summary: reviewResult.summary,
-              walkthrough: reviewResult.walkthrough,
-              diagram: reviewResult.diagram,
+              summary: reviewData.response.summary,
+              walkthrough: reviewData.response.walkthrough,
+              diagram: reviewData.response.diagram,
             }
           );
         } catch (error) {
@@ -427,25 +426,25 @@ export const processReview = inngest.createFunction(
       });
 
       await step.run("save-review", async () => {
-        const comments: ReviewComment[] = reviewResult.comments.map(
-          (c, index) => {
+        const comments: ReviewComment[] =
+          reviewData.response.comments.map((c, index) => {
             const posted = postedComments[index];
             return {
               path: c.path,
+              startLine: c.startLine,
               line: c.line,
               body: c.body,
               suggestion: c.suggestion,
               status: "pending" as const,
               githubCommentId: posted?.githubCommentId,
             };
-          }
-        );
+          });
 
         await db
           .update(reviews)
           .set({
             status: "completed",
-            summary: reviewResult.summary,
+            summary: reviewData.response.summary,
             comments,
             model: config.model,
             completedAt: new Date(),
@@ -453,60 +452,30 @@ export const processReview = inngest.createFunction(
           .where(eq(reviews.id, reviewId));
       });
 
-      await step.run("index-changed-files", async () => {
-        try {
-          const filesToIndex = Array.from(fileContents.entries()).map(
-            ([path, content]) => ({
-              path,
-              content,
-              fileType: "source" as const,
-            })
-          );
+      const commentCount = reviewData.response.comments.length;
+      await step.run("set-commit-status-success", async () => {
+        const description =
+          commentCount > 0
+            ? `Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`
+            : "No issues found";
 
-          if (filesToIndex.length > 0) {
-            const embeddingUsage = await indexChangedFiles(
-              repoId,
-              filesToIndex,
-              config.googleApiKey
-            );
-
-            if (embeddingUsage.totalTokens > 0) {
-              await logKeyUsage({
-                userId,
-                apiKeyId: config.apiKeyId,
-                repoId,
-                reviewId,
-                action: "embedding",
-                provider: "google",
-                model: EMBEDDING_MODEL,
-                inputTokens: embeddingUsage.totalTokens,
-                outputTokens: 0,
-                durationMs: embeddingUsage.totalDurationMs,
-                status: "success",
-              });
-            }
-          }
-        } catch (error) {
-          console.error("Incremental indexing failed (non-fatal):", error);
-        }
+        await createCommitStatus(githubToken, owner, repoName, headSha, {
+          state: "success",
+          description,
+        });
       });
 
-      const commentCount = reviewResult.comments.length;
-      await step.run("complete-check-run", async () => {
-        if (commentCount > 0) {
-          await completeCheckRun(githubToken, owner, repoName, checkRunId, {
-            conclusion: "success",
-            title: `Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`,
-            summary: `**KoinCode** reviewed this PR and found ${commentCount} issue${commentCount === 1 ? "" : "s"}.\n\nSee the inline comments below for details.`,
-          });
-        } else {
-          await completeCheckRun(githubToken, owner, repoName, checkRunId, {
-            conclusion: "neutral",
-            title: "No issues found",
-            summary:
-              "**KoinCode** reviewed this PR and found no issues. Looks good!",
-          });
-        }
+      await step.sendEvent("dispatch-index-changed-files", {
+        name: "repo/index-changed-files",
+        data: {
+          repoId,
+          userId,
+          reviewId,
+          repoFullName,
+          headSha,
+          filePaths: reviewData.reviewedFiles,
+          apiKeyId: config.apiKeyId,
+        },
       });
 
       return {
@@ -515,14 +484,13 @@ export const processReview = inngest.createFunction(
         commentsPosted: postedComments.length,
       };
     } catch (error) {
-      await step.run("complete-check-run-failure", async () => {
+      await step.run("set-commit-status-failure", async () => {
         const reason =
           error instanceof Error ? error.message : "Unknown error";
 
-        await completeCheckRun(githubToken, owner, repoName, checkRunId, {
-          conclusion: "failure",
-          title: "Review failed",
-          summary: `**KoinCode** could not complete the review.\n\nReason: ${reason}`,
+        await createCommitStatus(githubToken, owner, repoName, headSha, {
+          state: "error",
+          description: `Review failed: ${reason}`,
         });
 
         await db
@@ -536,6 +504,95 @@ export const processReview = inngest.createFunction(
 
       throw error;
     }
+  }
+);
+
+export const indexChangedFilesJob = inngest.createFunction(
+  {
+    id: "index-changed-files",
+    retries: 2,
+    triggers: [{ event: "repo/index-changed-files" }],
+  },
+  async ({ event }) => {
+    const {
+      repoId,
+      userId,
+      reviewId,
+      repoFullName,
+      headSha,
+      filePaths,
+      apiKeyId,
+    } = event.data;
+
+    const [owner, repoName] = repoFullName.split("/");
+
+    const [user] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return { status: "skipped", reason: "user-not-found" };
+
+    const client = await clerkClient();
+    const response = await client.users.getUserOauthAccessToken(
+      user.clerkId,
+      "github"
+    );
+    const githubToken = response.data[0]?.token;
+    if (!githubToken) return { status: "skipped", reason: "no-token" };
+
+    let googleApiKey: string | undefined;
+    const [googleKey] = await db
+      .select({ encryptedKey: apiKeys.encryptedKey })
+      .from(apiKeys)
+      .where(
+        and(eq(apiKeys.userId, userId), eq(apiKeys.provider, "google"))
+      )
+      .limit(1);
+
+    if (googleKey) googleApiKey = decrypt(googleKey.encryptedKey);
+
+    let totalTokens = 0;
+    let totalDurationMs = 0;
+    let filesIndexed = 0;
+
+    for (const filePath of filePaths) {
+      const content = await fetchFileContent(
+        githubToken,
+        owner,
+        repoName,
+        filePath,
+        headSha
+      );
+
+      if (!content) continue;
+
+      const file = { path: filePath, content, fileType: "source" as const };
+      const usage = await indexChangedFiles(repoId, [file], googleApiKey);
+
+      totalTokens += usage.totalTokens;
+      totalDurationMs += usage.totalDurationMs;
+      filesIndexed++;
+    }
+
+    if (totalTokens > 0) {
+      await logKeyUsage({
+        userId,
+        apiKeyId,
+        repoId,
+        reviewId,
+        action: "embedding",
+        provider: "google",
+        model: EMBEDDING_MODEL,
+        inputTokens: totalTokens,
+        outputTokens: 0,
+        durationMs: totalDurationMs,
+        status: "success",
+      });
+    }
+
+    return { status: "indexed", files: filesIndexed };
   }
 );
 

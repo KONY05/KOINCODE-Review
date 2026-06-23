@@ -41,6 +41,7 @@ export const reviews = pgTable("reviews", {
 
 export type ReviewComment = {
   path: string;
+  startLine?: number;
   line: number;
   body: string;
   suggestion?: string;

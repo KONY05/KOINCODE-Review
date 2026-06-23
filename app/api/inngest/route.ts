@@ -5,9 +5,16 @@ import {
   cleanupDisconnectedRepos,
   processReview,
   processCommentReply,
+  indexChangedFilesJob,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [indexRepo, cleanupDisconnectedRepos, processReview, processCommentReply],
+  functions: [
+    indexRepo,
+    cleanupDisconnectedRepos,
+    processReview,
+    processCommentReply,
+    indexChangedFilesJob,
+  ],
 });

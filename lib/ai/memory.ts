@@ -35,15 +35,27 @@ export async function extractRule(params: {
 
   const startTime = Date.now();
 
-  const result = await generateText({
-    model: llmProvider(params.model),
-    output: Output.object({ schema: ruleExtractionSchema }),
-    system: EXTRACT_RULE_SYSTEM_PROMPT,
-    prompt:
-      `## Original review comment\n${params.originalComment}\n\n` +
-      `## Developer's reply\n${params.userReply}`,
-    maxOutputTokens: 256,
-  });
+  let result;
+  try {
+    result = await generateText({
+      model: llmProvider(params.model),
+      output: Output.object({ schema: ruleExtractionSchema }),
+      system: EXTRACT_RULE_SYSTEM_PROMPT,
+      prompt:
+        `## Original review comment\n${params.originalComment}\n\n` +
+        `## Developer's reply\n${params.userReply}`,
+      maxOutputTokens: 256,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "AI_NoOutputGeneratedError"
+    ) {
+      const durationMs = Date.now() - startTime;
+      return { rule: null, usage: { inputTokens: 0, outputTokens: 0 }, durationMs };
+    }
+    throw error;
+  }
 
   const durationMs = Date.now() - startTime;
 

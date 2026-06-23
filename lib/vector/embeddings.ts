@@ -22,6 +22,7 @@ export function chunkText(text: string): TextChunk[] {
   while (start < text.length) {
     const end = Math.min(start + MAX_CHUNK_SIZE, text.length);
     chunks.push({ text: text.slice(start, end), chunkIndex });
+    if (end === text.length) break;
     start = end - CHUNK_OVERLAP;
     chunkIndex++;
   }

@@ -1,56 +1,31 @@
 import { Octokit } from "@octokit/rest";
 
-type CheckRunConclusion = "success" | "failure" | "neutral";
+type CommitState = "pending" | "success" | "failure" | "error";
 
-type CompleteCheckRunParams = {
-  conclusion: CheckRunConclusion;
-  title: string;
-  summary: string;
+type CommitStatusParams = {
+  state: CommitState;
+  description: string;
+  targetUrl?: string;
 };
 
-export async function createCheckRun(
+const STATUS_CONTEXT = "KoinCode Review";
+
+export async function createCommitStatus(
   token: string,
   owner: string,
   repo: string,
-  headSha: string
-): Promise<number> {
-  const octokit = new Octokit({ auth: token });
-
-  const { data } = await octokit.checks.create({
-    owner,
-    repo,
-    name: "KoinCode Review",
-    head_sha: headSha,
-    status: "in_progress",
-    started_at: new Date().toISOString(),
-    output: {
-      title: "Review in progress",
-      summary: "Analyzing your pull request...",
-    },
-  });
-
-  return data.id;
-}
-
-export async function completeCheckRun(
-  token: string,
-  owner: string,
-  repo: string,
-  checkRunId: number,
-  result: CompleteCheckRunParams
+  sha: string,
+  params: CommitStatusParams
 ): Promise<void> {
   const octokit = new Octokit({ auth: token });
 
-  await octokit.checks.update({
+  await octokit.repos.createCommitStatus({
     owner,
     repo,
-    check_run_id: checkRunId,
-    status: "completed",
-    conclusion: result.conclusion,
-    completed_at: new Date().toISOString(),
-    output: {
-      title: result.title,
-      summary: result.summary,
-    },
+    sha,
+    state: params.state,
+    description: params.description.slice(0, 140),
+    target_url: params.targetUrl,
+    context: STATUS_CONTEXT,
   });
 }

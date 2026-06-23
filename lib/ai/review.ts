@@ -17,6 +17,7 @@ const reviewResponseSchema = z.object({
   comments: z.array(
     z.object({
       path: z.string(),
+      startLine: z.number().optional(),
       line: z.number(),
       body: z.string(),
       suggestion: z.string().optional(),

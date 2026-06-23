@@ -22,9 +22,16 @@ export async function deleteNamespace(namespace: string) {
   await index.namespace(namespace).deleteAll();
 }
 
-export async function deleteByFilePath(namespace: string, filePath: string) {
+const MAX_CHUNKS_PER_FILE = 50;
+
+export async function deleteByFilePath(
+  namespace: string,
+  repoId: string,
+  filePath: string
+) {
   const index = getIndex();
-  await index.namespace(namespace).deleteMany({
-    filter: { filePath: { $eq: filePath } },
-  });
+  const ids = Array.from({ length: MAX_CHUNKS_PER_FILE }, (_, i) =>
+    `${repoId}:${filePath}:${i}`
+  );
+  await index.namespace(namespace).deleteMany({ ids });
 }
