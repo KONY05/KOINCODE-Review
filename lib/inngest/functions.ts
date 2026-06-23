@@ -323,19 +323,36 @@ export const processReview = inngest.createFunction(
           );
 
         let codebaseContext: { filePath: string; text: string }[] = [];
+        const googleApiKey = config.googleEncryptedKey
+          ? decrypt(config.googleEncryptedKey)
+          : undefined;
         try {
           const query = buildContextQuery(
             prTitle,
             prFiles.map((f) => f.filename)
           );
-          const googleApiKey = config.googleEncryptedKey
-            ? decrypt(config.googleEncryptedKey)
-            : undefined;
-          codebaseContext = await retrieveContext(
+          const retrieval = await retrieveContext(
             repoId,
             query,
             googleApiKey
           );
+          codebaseContext = retrieval.contexts;
+
+          if (retrieval.usage.tokens > 0) {
+            await logKeyUsage({
+              userId,
+              apiKeyId: config.apiKeyId,
+              repoId,
+              reviewId,
+              action: "embedding",
+              provider: "google",
+              model: EMBEDDING_MODEL,
+              inputTokens: retrieval.usage.tokens,
+              outputTokens: 0,
+              durationMs: retrieval.durationMs,
+              status: "success",
+            });
+          }
         } catch {
           // non-fatal
         }
