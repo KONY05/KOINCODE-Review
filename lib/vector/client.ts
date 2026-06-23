@@ -1,6 +1,12 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 
 import { env } from "@/config/env";
+import { MAX_CHUNK_SIZE, CHUNK_OVERLAP } from "./embeddings";
+
+const MAX_FILE_SIZE = 100_000;
+const MAX_CHUNKS_PER_FILE = Math.ceil(
+  MAX_FILE_SIZE / (MAX_CHUNK_SIZE - CHUNK_OVERLAP)
+);
 
 let pineconeClient: Pinecone | null = null;
 
@@ -21,8 +27,6 @@ export async function deleteNamespace(namespace: string) {
   const index = getIndex();
   await index.namespace(namespace).deleteAll();
 }
-
-const MAX_CHUNKS_PER_FILE = 50;
 
 export async function deleteByFilePath(
   namespace: string,

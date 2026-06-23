@@ -2,8 +2,8 @@ import { embedMany } from "ai";
 import { createGoogleGenerativeAI, google } from "@ai-sdk/google";
 
 export const EMBEDDING_MODEL = "gemini-embedding-2";
-const MAX_CHUNK_SIZE = 4000;
-const CHUNK_OVERLAP = 200;
+export const MAX_CHUNK_SIZE = 4000;
+export const CHUNK_OVERLAP = 200;
 
 export type TextChunk = {
   text: string;
