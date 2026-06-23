@@ -3,7 +3,7 @@
 import { and, eq, gte, desc, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { keyUsageLogs, repos } from "@/lib/db/schema";
+import { keyUsageLogs, repos, reviews } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import type { UsageAction, UsageStatus } from "@/lib/db/schema/key-usage-logs";
@@ -20,6 +20,7 @@ export type LogEntry = {
   error: string | null;
   createdAt: string;
   repoFullName: string | null;
+  prNumber: number | null;
 };
 
 export type LogsSummary = {
@@ -94,9 +95,11 @@ export async function fetchLogs(
         error: keyUsageLogs.error,
         createdAt: keyUsageLogs.createdAt,
         repoFullName: repos.fullName,
+        prNumber: reviews.prNumber,
       })
       .from(keyUsageLogs)
       .leftJoin(repos, eq(keyUsageLogs.repoId, repos.id))
+      .leftJoin(reviews, eq(keyUsageLogs.reviewId, reviews.id))
       .where(and(...conditions))
       .orderBy(desc(keyUsageLogs.createdAt), desc(keyUsageLogs.id))
       .limit(PAGE_SIZE)
@@ -114,6 +117,7 @@ export async function fetchLogs(
       error: r.error,
       createdAt: r.createdAt.toISOString(),
       repoFullName: r.repoFullName,
+      prNumber: r.prNumber,
     }));
 
     return ok({ logs, totalCount: total, pageCount });

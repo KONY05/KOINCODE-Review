@@ -68,6 +68,17 @@ export const columns = [
       </span>
     ),
   }),
+  columnHelper.accessor("prNumber", {
+    header: "PR",
+    cell: (info) => {
+      const pr = info.getValue();
+      return (
+        <span className="font-mono text-[12.5px] text-(--kc-text-muted)">
+          {pr ? `#${pr}` : "—"}
+        </span>
+      );
+    },
+  }),
   columnHelper.accessor("model", {
     header: "Model",
     cell: (info) => (
