@@ -36,9 +36,11 @@ export function formatRelativeTime(dateString: string): string {
 
 export function formatDate(iso: string | null): string {
   if (!iso) return "Never";
-  return new Date(iso).toLocaleDateString("en-US", {
+  return new Date(iso).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
