@@ -15,7 +15,13 @@ function getYearRange() {
   return `(${MONTH_LABELS[yearAgo.getMonth()]} ${yearAgo.getFullYear()} – ${MONTH_LABELS[now.getMonth()]} ${now.getFullYear()})`;
 }
 
-export default function Stats({ contributionStats }: { contributionStats: ContributionStats | null }) {
+export default function Stats({
+  contributionStats,
+  totalReviews,
+}: {
+  contributionStats: ContributionStats | null;
+  totalReviews: number;
+}) {
   const range = getYearRange();
 
   const stats = [
@@ -48,8 +54,8 @@ export default function Stats({ contributionStats }: { contributionStats: Contri
     },
     {
       label: "AI Reviews",
-      value: "0",
-      sub: "Generated reviews",
+      value: String(totalReviews),
+      sub: "Completed reviews",
       icon: MessageSquareIcon,
       accent: true,
     },

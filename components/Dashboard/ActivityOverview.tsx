@@ -5,6 +5,7 @@ import { Skeleton } from "../ui/skeleton";
 
 import { MONTH_LABELS } from "@/lib/constants";
 import type { MonthlyActivity } from "@/lib/github/contributions";
+import type { MonthlyReviewCount } from "@/lib/actions/reviews";
 
 function formatMonth(yearMonth: string) {
   const month = parseInt(yearMonth.split("-")[1], 10);
@@ -15,14 +16,17 @@ type TooltipState = {
   month: string;
   commits: number;
   pullRequests: number;
+  reviews: number;
   x: number;
   y: number;
 } | null;
 
 export default function ActivityOverview({
   monthlyActivity,
+  monthlyReviews,
 }: {
   monthlyActivity: MonthlyActivity[] | null;
+  monthlyReviews: MonthlyReviewCount[];
 }) {
   const [tooltip, setTooltip] = useState<TooltipState>(null);
 
@@ -46,15 +50,24 @@ export default function ActivityOverview({
     );
   }
 
+  const reviewsMap = new Map(
+    monthlyReviews.map((r) => [r.month, r.reviews])
+  );
+
+  const chartData = monthlyActivity.map((m) => ({
+    ...m,
+    reviews: reviewsMap.get(m.month) ?? 0,
+  }));
+
   const maxValue = Math.max(
-    ...monthlyActivity.flatMap((m) => [m.commits, m.pullRequests]),
+    ...chartData.flatMap((m) => [m.commits, m.pullRequests, m.reviews]),
     1
   );
   const maxBarHeight = 120;
 
   function handleMouseEnter(
     e: React.MouseEvent,
-    m: MonthlyActivity
+    m: (typeof chartData)[number]
   ) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const parent = (e.currentTarget as HTMLElement)
@@ -65,6 +78,7 @@ export default function ActivityOverview({
       month: formatMonth(m.month),
       commits: m.commits,
       pullRequests: m.pullRequests,
+      reviews: m.reviews,
       x: rect.left - parent.left + rect.width / 2,
       y: rect.top - parent.top - 8,
     });
@@ -92,12 +106,17 @@ export default function ActivityOverview({
               <span className="inline-block size-[8px] rounded-sm bg-[#a371f7] mr-1" />
               {tooltip.pullRequests} PRs
             </p>
+            <p className="text-[11px] text-(--kc-text-muted)">
+              <span className="inline-block size-[8px] rounded-sm bg-kc-green mr-1" />
+              {tooltip.reviews} reviews
+            </p>
           </div>
         )}
 
-        {monthlyActivity.map((m) => {
+        {chartData.map((m) => {
           const commitH = Math.max((m.commits / maxValue) * maxBarHeight, 4);
           const prH = Math.max((m.pullRequests / maxValue) * maxBarHeight, 4);
+          const reviewH = Math.max((m.reviews / maxValue) * maxBarHeight, 4);
 
           return (
             <div
@@ -114,6 +133,10 @@ export default function ActivityOverview({
                 <div
                   className="w-[16px] rounded-sm bg-[#a371f7] transition-opacity hover:opacity-80 sm:w-[22px]"
                   style={{ height: `${prH}px` }}
+                />
+                <div
+                  className="w-[16px] rounded-sm bg-kc-green transition-opacity hover:opacity-80 sm:w-[22px]"
+                  style={{ height: `${reviewH}px` }}
                 />
               </div>
               <span className="text-[12px] text-(--kc-text-muted)">

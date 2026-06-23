@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, desc, lt, count } from "drizzle-orm";
+import { and, eq, desc, lt, gte, count, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { reviews, repos } from "@/lib/db/schema";
@@ -121,5 +121,54 @@ export async function fetchReviewsSummary(): Promise<
     return fail(
       "Failed to fetch reviews summary", e
     );
+  }
+}
+
+export type MonthlyReviewCount = {
+  month: string;
+  reviews: number;
+};
+
+export async function fetchMonthlyReviewCounts(): Promise<
+  ActionResult<MonthlyReviewCount[]>
+> {
+  try {
+    const user = await getAuthUser();
+    if (!user) return fail("Unauthorized");
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const rows = await db
+      .select({
+        month: sql<string>`to_char(${reviews.createdAt}, 'YYYY-MM')`,
+        count: count(),
+      })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.userId, user.id),
+          eq(reviews.status, "completed"),
+          gte(reviews.createdAt, sixMonthsAgo)
+        )
+      )
+      .groupBy(sql`to_char(${reviews.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${reviews.createdAt}, 'YYYY-MM')`);
+
+    const countsMap = new Map(rows.map((r) => [r.month, r.count]));
+
+    const result: MonthlyReviewCount[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      result.push({ month, reviews: countsMap.get(month) ?? 0 });
+    }
+
+    return ok(result);
+  } catch (e) {
+    return fail("Failed to fetch monthly review counts", e);
   }
 }
