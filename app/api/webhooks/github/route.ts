@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 import { env } from "@/config/env";
 import { db } from "@/lib/db";
@@ -24,6 +24,7 @@ type PullRequestPayload = {
   pull_request: {
     title: string;
     html_url: string;
+    merged?: boolean;
     head: {
       sha: string;
       ref: string;
@@ -76,7 +77,88 @@ function verifySignature(payload: string, signature: string | null): boolean {
   );
 }
 
+async function cancelInFlightReviews(
+  repoId: string,
+  prNumber: number,
+  summary: string
+) {
+  const inFlight = await db
+    .select({ id: reviews.id })
+    .from(reviews)
+    .where(
+      and(
+        eq(reviews.repoId, repoId),
+        eq(reviews.prNumber, prNumber),
+        inArray(reviews.status, ["pending", "in_progress"])
+      )
+    );
+
+  if (inFlight.length === 0) return [];
+
+  await db
+    .update(reviews)
+    .set({ status: "failed", summary })
+    .where(
+      and(
+        eq(reviews.repoId, repoId),
+        eq(reviews.prNumber, prNumber),
+        inArray(reviews.status, ["pending", "in_progress"])
+      )
+    );
+
+  return inFlight;
+}
+
+async function handlePullRequestClosed(payload: PullRequestPayload) {
+  const [repo] = await db
+    .select({ id: repos.id, userId: repos.userId })
+    .from(repos)
+    .where(
+      and(
+        eq(repos.githubId, payload.repository.id),
+        eq(repos.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (!repo) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  const summary = payload.pull_request.merged
+    ? "Review cancelled — PR was merged."
+    : "Review cancelled — PR was closed.";
+
+  const cancelled = await cancelInFlightReviews(
+    repo.id,
+    payload.number,
+    summary
+  );
+
+  if (cancelled.length === 0) {
+    return NextResponse.json({ ignored: true });
+  }
+
+  const events = cancelled.map((r) => ({
+    name: "pr/review-cancelled" as const,
+    data: {
+      reviewId: r.id,
+      repoFullName: payload.repository.full_name,
+      headSha: payload.pull_request.head.sha,
+      userId: repo.userId,
+    },
+  }));
+
+  await inngest.send(events);
+
+  return NextResponse.json({ cancelled: cancelled.length });
+}
+
 async function handlePullRequest(payload: PullRequestPayload) {
+  if (payload.action === "closed") {
+    return handlePullRequestClosed(payload);
+  }
+
   if (!REVIEWABLE_ACTIONS.has(payload.action)) {
     return NextResponse.json({ ignored: true });
   }
@@ -98,6 +180,14 @@ async function handlePullRequest(payload: PullRequestPayload) {
 
   if (!repo) {
     return NextResponse.json({ ignored: true });
+  }
+
+  if (payload.action === "synchronize") {
+    await cancelInFlightReviews(
+      repo.id,
+      payload.number,
+      "Superseded by newer commit."
+    );
   }
 
   const [review] = await db

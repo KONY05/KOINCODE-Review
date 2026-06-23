@@ -4,6 +4,7 @@ import {
   indexRepo,
   cleanupDisconnectedRepos,
   processReview,
+  cancelReview,
   processCommentReply,
   indexChangedFilesJob,
 } from "@/lib/inngest/functions";
@@ -14,6 +15,7 @@ export const { GET, POST, PUT } = serve({
     indexRepo,
     cleanupDisconnectedRepos,
     processReview,
+    cancelReview,
     processCommentReply,
     indexChangedFilesJob,
   ],

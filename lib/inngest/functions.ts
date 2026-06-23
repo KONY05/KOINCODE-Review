@@ -174,6 +174,52 @@ export const cleanupDisconnectedRepos = inngest.createFunction(
   }
 );
 
+export const cancelReview = inngest.createFunction(
+  {
+    id: "cancel-review",
+    retries: 0,
+    triggers: [{ event: "pr/review-cancelled" }],
+  },
+  async ({ event }) => {
+    const { repoFullName, headSha, userId } = event.data;
+    const [owner, repoName] = repoFullName.split("/");
+
+    const [user] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return { status: "skipped", reason: "user-not-found" };
+
+    const client = await clerkClient();
+    const response = await client.users.getUserOauthAccessToken(
+      user.clerkId,
+      "github"
+    );
+    
+    const token = response.data[0]?.token;
+    if (!token) return { status: "skipped", reason: "no-token" };
+
+    await createCommitStatus(token, owner, repoName, headSha, {
+      state: "success",
+      description: "Review cancelled — PR closed",
+    });
+
+    return { status: "cancelled" };
+  }
+);
+
+async function isReviewStillActive(reviewId: string): Promise<boolean> {
+  const [review] = await db
+    .select({ status: reviews.status })
+    .from(reviews)
+    .where(eq(reviews.id, reviewId))
+    .limit(1);
+
+  return review?.status === "in_progress";
+}
+
 export const processReview = inngest.createFunction(
   {
     id: "process-review",
@@ -293,6 +339,14 @@ export const processReview = inngest.createFunction(
           .set({ status: "in_progress" })
           .where(eq(reviews.id, reviewId));
       });
+
+      const stillActive = await step.run("check-still-active", async () => {
+        return isReviewStillActive(reviewId);
+      });
+
+      if (!stillActive) {
+        return { status: "cancelled", reviewId };
+      }
 
       const reviewData = await step.run("run-review", async () => {
         const [prFiles, diff] = await Promise.all([
