@@ -22,10 +22,12 @@ If the changes involve a multi-step flow (API calls, event handling, data pipeli
 
 ## 4. Inline Comments
 Review the diff for:
-- **Bugs** — logic errors, off-by-one mistakes, null/undefined access, race conditions.
-- **Security issues** — injection vulnerabilities, exposed secrets, missing auth checks.
-- **Performance problems** — unnecessary re-renders, N+1 queries, missing indexes, memory leaks.
-- **Code quality** — unclear naming, duplicated logic, overly complex control flow.
+- **Bugs** — logic errors, off-by-one mistakes, null/undefined access, race conditions, infinite loops, missing error handling on fallible operations.
+- **Security issues** — unescaped user input in RegExp/SQL/HTML/shell (e.g., \`new RegExp(userInput)\` is ReDoS-vulnerable), exposed secrets, missing auth checks, prototype pollution, XSS vectors, unsafe \`eval\`/\`dangerouslySetInnerHTML\`.
+- **Performance problems** — unnecessary re-renders, N+1 queries, missing indexes, memory leaks, unbounded array growth, synchronous blocking in async paths.
+- **Code quality** — direct state mutation (e.g., \`array.push()\` then \`setState(array)\` instead of creating a new array), unclear naming, duplicated logic, overly complex control flow.
+
+IMPORTANT: Do NOT say "no issues found" unless you have carefully checked every changed line against the categories above. A clean-looking PR can still have subtle bugs. Err on the side of flagging potential issues — a false positive is better than a missed bug.
 
 Rules for inline comments:
 - Be specific and actionable. Reference exact variable names and the surrounding context (e.g., "Inside the \`toggleTodo\` function…", "In the \`useEffect\` that fetches user data…", "Within the \`handleSubmit\` callback…"). The reader should immediately know WHERE in the file the issue lives without opening it.
