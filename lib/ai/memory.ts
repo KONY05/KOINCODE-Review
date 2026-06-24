@@ -47,10 +47,7 @@ export async function extractRule(params: {
       maxOutputTokens: 256,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.name === "AI_NoOutputGeneratedError"
-    ) {
+    if (error instanceof Error && error.name === "AI_NoOutputGeneratedError") {
       const durationMs = Date.now() - startTime;
       return { rule: null, usage: { inputTokens: 0, outputTokens: 0 }, durationMs };
     }
@@ -64,9 +61,14 @@ export async function extractRule(params: {
     outputTokens: result.usage?.outputTokens ?? 0,
   };
 
-  if (!result.output) return { rule: null, usage, durationMs };
+  let output: z.infer<typeof ruleExtractionSchema> | null;
+  try {
+    output = result.output;
+  } catch {
+    return { rule: null, usage, durationMs };
+  }
 
-  const { rule } = result.output;
+  const rule = output?.rule;
   if (!rule || rule.length > 280) return { rule: null, usage, durationMs };
 
   return { rule, usage, durationMs };

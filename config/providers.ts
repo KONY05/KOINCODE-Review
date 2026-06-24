@@ -41,6 +41,8 @@ export const PROVIDERS: readonly ProviderConfig[] = [
       "moonshotai/kimi-k2.7-code",
       "qwen/qwen3.7-plus",
       "deepseek/deepseek-v4-pro",
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "openrouter/owl-alpha"
     ],
   },
 ] as const;
