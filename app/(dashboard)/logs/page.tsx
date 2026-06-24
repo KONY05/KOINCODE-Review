@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
+
 import {
   fetchLogs,
   fetchLogsSummary,
   fetchUserRepoOptions,
 } from "@/lib/actions/logs";
 import { LogsPageClient } from "../../../components/Logs/LogsPageClient";
+
+export const metadata: Metadata = { title: "Usage Logs" };
 
 export default async function LogsPage() {
   const defaultFilter = { days: 30 };

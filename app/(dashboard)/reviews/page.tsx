@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   CheckCircle2Icon,
   ClockIcon,
@@ -7,6 +8,8 @@ import {
 
 import ReviewList from "@/components/Reviews/ReviewList";
 import { fetchReviews, fetchReviewsSummary } from "@/lib/actions/reviews";
+
+export const metadata: Metadata = { title: "Reviews" };
 
 const STAT_CARDS = [
   { key: "total", label: "Total Reviews", icon: GitPullRequestArrowIcon },

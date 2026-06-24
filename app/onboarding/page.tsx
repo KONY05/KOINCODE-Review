@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "Onboarding" };
 
 import { getAuthUser } from "@/lib/actions/auth";
 import { OnboardingForm } from "@/components/Onboarding/onboarding-form";

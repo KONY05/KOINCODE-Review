@@ -1,7 +1,11 @@
+import type { Metadata } from "next";
+
 import APIKeySection from "@/components/Settings/APIKeySection";
 import RepoMemorySection from "@/components/Settings/RepoMemorySection";
 import { getApiKeys } from "@/lib/actions/api-keys";
 import { getRepoMemories, getConnectedRepos } from "@/lib/actions/repo-memories";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const [keysResult, memoriesResult, reposResult] = await Promise.all([

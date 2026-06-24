@@ -18,8 +18,38 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KOINCODE Review",
-  description: "AI-powered code review agent for your pull requests",
+  title: {
+    default: "KOINCODE Review",
+    template: "%s · KOINCODE Review",
+  },
+  description:
+    "AI-powered code review agent — get automated reviews with fix suggestions on every pull request. Bring your own LLM key, connect your repos, ship better code.",
+  keywords: [
+    "code review",
+    "AI code review",
+    "pull request review",
+    "automated code review",
+    "GitHub",
+    "LLM",
+    "BYOK",
+    "developer tools",
+  ],
+  authors: [{ name: "KOINCODE" }],
+  creator: "KOINCODE",
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
+  openGraph: {
+    type: "website",
+    siteName: "KOINCODE Review",
+    title: "KOINCODE Review",
+    description:
+      "AI-powered code review agent — automated reviews with fix suggestions on every pull request.",
+  },
+  twitter: {
+    card: "summary",
+    title: "KOINCODE Review",
+    description:
+      "AI-powered code review agent — automated reviews with fix suggestions on every pull request.",
+  },
 };
 
 export default function RootLayout({

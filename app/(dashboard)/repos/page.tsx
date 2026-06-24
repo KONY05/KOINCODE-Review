@@ -1,5 +1,9 @@
+import type { Metadata } from "next";
+
 import { listGithubRepos } from "@/lib/actions/repos";
 import RepoList from "@/components/Repository/RepoList";
+
+export const metadata: Metadata = { title: "Repositories" };
 
 export default async function ReposPage() {
   const result = await listGithubRepos(1, 20);

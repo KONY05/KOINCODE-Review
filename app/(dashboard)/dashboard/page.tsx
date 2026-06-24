@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import Stats from "@/components/Dashboard/Stats";
 import GithubActivity from "@/components/Dashboard/GithubActivity";
 import ActivityOverview from "@/components/Dashboard/ActivityOverview";
@@ -7,6 +9,8 @@ import {
   fetchReviewsSummary,
   fetchMonthlyReviewCounts,
 } from "@/lib/actions/reviews";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const [token, summaryResult, monthlyResult] = await Promise.all([
