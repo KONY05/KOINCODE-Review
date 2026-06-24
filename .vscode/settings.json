@@ -13,7 +13,9 @@
     "openrouter",
     "qwen",
     "svix",
+    "TOCTOU",
     "unmappable",
+    "unsynchronized",
     "upserted"
   ]
 }
