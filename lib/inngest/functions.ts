@@ -349,6 +349,8 @@ export const processReview = inngest.createFunction(
       }
 
       const reviewData = await step.run("run-review", async () => {
+        if (!(await isReviewStillActive(reviewId))) return null;
+
         const [prFiles, diff] = await Promise.all([
           fetchPRFiles(githubToken, owner, repoName, prNumber),
           fetchPRDiff(githubToken, owner, repoName, prNumber),
@@ -471,6 +473,10 @@ export const processReview = inngest.createFunction(
           throw error;
         }
       });
+
+      if (!reviewData) {
+        return { status: "cancelled", reviewId };
+      }
 
       const postedComments = await step.run("post-comments", async () => {
         const patches = new Map(Object.entries(reviewData.patches));

@@ -12,11 +12,11 @@ const columnHelper = createColumnHelper<MemoryRow>();
 
 type ColumnActions = {
   onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDeleteRequest: (id: string) => void;
   isPending: boolean;
 };
 
-export function getMemoryColumns({ onToggle, onDelete, isPending }: ColumnActions) {
+export function getMemoryColumns({ onToggle, onDeleteRequest, isPending }: ColumnActions) {
   return [
     columnHelper.accessor("repoFullName", {
       header: "Repository",
@@ -90,7 +90,7 @@ export function getMemoryColumns({ onToggle, onDelete, isPending }: ColumnAction
       cell: ({ row }) => (
         <button
           type="button"
-          onClick={() => onDelete(row.original.id)}
+          onClick={() => onDeleteRequest(row.original.id)}
           disabled={isPending}
           className="cursor-pointer rounded-lg p-1.5 text-(--kc-text-dim) transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
         >

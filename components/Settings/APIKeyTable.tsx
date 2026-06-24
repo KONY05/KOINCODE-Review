@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { getProviderConfig } from "@/config/providers";
 import {
@@ -37,6 +47,7 @@ function providerLabel(provider: string) {
 export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   function handleToggle(keyId: string) {
     startTransition(async () => {
@@ -61,9 +72,11 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
     });
   }
 
-  function handleDelete(keyId: string) {
+  function confirmDelete() {
+    if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await deleteApiKey(keyId);
+      const result = await deleteApiKey(deleteTarget);
+      setDeleteTarget(null);
       if (result.success) {
         router.refresh();
         toast.success("API key deleted.");
@@ -74,6 +87,7 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
   }
 
   return (
+    <>
     <div className="mt-6 overflow-hidden rounded-[14px] border border-(--kc-border-subtle)">
       <Table>
         <TableHeader>
@@ -180,7 +194,7 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
                 <TableCell className="px-5 py-4">
                   <button
                     type="button"
-                    onClick={() => handleDelete(key.id)}
+                    onClick={() => setDeleteTarget(key.id)}
                     disabled={isPending}
                     className="rounded-lg p-1.5 text-(--kc-text-dim) transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
@@ -193,5 +207,26 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
         </TableBody>
       </Table>
     </div>
+
+    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove the API key. Reviews using this key will stop working until you add a new one.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={confirmDelete}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

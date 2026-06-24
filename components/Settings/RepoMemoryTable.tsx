@@ -20,6 +20,16 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   getRepoMemories,
   toggleMemoryActive,
   deleteMemory,
@@ -46,6 +56,7 @@ export function RepoMemoryTable({
   const [pageCount, setPageCount] = useState(initialPageCount);
   const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [pageIndex, setPageIndex] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   function refreshPage(page: number) {
     startTransition(async () => {
@@ -69,9 +80,11 @@ export function RepoMemoryTable({
     });
   }
 
-  function handleDelete(memoryId: string) {
+  function confirmDelete() {
+    if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await deleteMemory(memoryId);
+      const result = await deleteMemory(deleteTarget);
+      setDeleteTarget(null);
       if (result.success) {
         toast.success("Memory deleted.");
         const newTotal = totalCount - 1;
@@ -88,7 +101,7 @@ export function RepoMemoryTable({
 
   const columns = getMemoryColumns({
     onToggle: handleToggle,
-    onDelete: handleDelete,
+    onDeleteRequest: setDeleteTarget,
     isPending,
   });
 
@@ -206,6 +219,26 @@ export function RepoMemoryTable({
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Memory</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this rule. The review agent will no longer apply it to future reviews.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

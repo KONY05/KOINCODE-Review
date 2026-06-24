@@ -97,7 +97,7 @@ export function APIKeyForm({
       <div className="mb-3 mt-6 font-mono text-[11px] tracking-[0.14em] text-(--kc-text-dim)">
         2 · MODEL
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex max-h-[140px] md:max-h-[200px] flex-col gap-2 overflow-y-auto">
         {currentProvider.models.map((m) => {
           const selected = m === model;
           return (
