@@ -97,7 +97,7 @@ export const indexRepo = inngest.createFunction(
 
       const embeddingUsage = await indexRepoFiles(repoId, files, googleApiKey);
 
-      if (repo && embeddingUsage.totalTokens > 0) {
+      if (repo && googleKeyId && embeddingUsage.totalTokens > 0) {
         await logKeyUsage({
           userId: repo.userId,
           apiKeyId: googleKeyId,
@@ -119,7 +119,7 @@ export const indexRepo = inngest.createFunction(
 
       return { indexed: files.length };
     } catch (error) {
-      if (repo) {
+      if (repo && googleKeyId) {
         await logKeyUsage({
           userId: repo.userId,
           apiKeyId: googleKeyId,
@@ -392,7 +392,7 @@ export const processReview = inngest.createFunction(
           );
           codebaseContext = retrieval.contexts;
 
-          if (retrieval.usage.tokens > 0) {
+          if (googleApiKey && retrieval.usage.tokens > 0) {
             await logKeyUsage({
               userId,
               apiKeyId: config.apiKeyId,
@@ -647,7 +647,7 @@ export const indexChangedFilesJob = inngest.createFunction(
       filesIndexed++;
     }
 
-    if (totalTokens > 0) {
+    if (googleApiKey && totalTokens > 0) {
       await logKeyUsage({
         userId,
         apiKeyId,
