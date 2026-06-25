@@ -1,6 +1,8 @@
 import Logo from "@/components/Logo";
 import { AuthenticateWithRedirectCallback } from "@clerk/nextjs";
 
+import { SignInTracker } from "./sign-in-tracker";
+
 export default function SSOCallbackPage() {
   return (
     <div className="flex items-center justify-center min-h-dvh bg-(--kc-bg)">
@@ -10,6 +12,7 @@ export default function SSOCallbackPage() {
           Completing sign in…
         </p>
       </div>
+      <SignInTracker />
       <AuthenticateWithRedirectCallback />
     </div>
   );

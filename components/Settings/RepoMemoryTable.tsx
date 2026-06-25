@@ -56,7 +56,7 @@ export function RepoMemoryTable({
   const [pageCount, setPageCount] = useState(initialPageCount);
   const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [pageIndex, setPageIndex] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MemoryRow | null>(null);
 
   function refreshPage(page: number) {
     startTransition(async () => {
@@ -83,7 +83,7 @@ export function RepoMemoryTable({
   function confirmDelete() {
     if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await deleteMemory(deleteTarget);
+      const result = await deleteMemory(deleteTarget.id);
       setDeleteTarget(null);
       if (result.success) {
         toast.success("Memory deleted.");
@@ -101,7 +101,10 @@ export function RepoMemoryTable({
 
   const columns = getMemoryColumns({
     onToggle: handleToggle,
-    onDeleteRequest: setDeleteTarget,
+    onDeleteRequest: (id: string) => {
+      const memory = data.find((m) => m.id === id);
+      if (memory) setDeleteTarget(memory);
+    },
     isPending,
   });
 
@@ -223,9 +226,9 @@ export function RepoMemoryTable({
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Memory</AlertDialogTitle>
+            <AlertDialogTitle>Delete Memory from {deleteTarget?.repoFullName ?? "repo"}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove this rule. The review agent will no longer apply it to future reviews.
+              This will permanently remove the rule: &ldquo;<strong>{deleteTarget?.rule}</strong>&rdquo;. The review agent will no longer apply it to future reviews.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

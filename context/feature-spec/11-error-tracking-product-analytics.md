@@ -178,7 +178,86 @@ All event names use `snake_case`. Properties follow Mixpanel conventions (`$` pr
 | `.env.local` | Add new env var placeholders |
 | `package.json` | Add `@sentry/nextjs`, `mixpanel-browser`, `mixpanel` |
 
-### 7. Env Var Summary
+### 7. Mixpanel Dashboard — Report Reference (Free Plan: 5 Reports)
+
+#### Report 1: Onboarding Funnel
+
+**Type:** Funnel
+**Events (in order):** `user_signed_in` → `onboarding_completed` → `repo_connected` → `review_completed`
+**Conversion window:** 7 days
+
+**How to read it:**
+- Each step shows the % of users who progressed from the previous step.
+- A steep drop between `user_signed_in` and `onboarding_completed` means the onboarding UX is losing people — simplify it or make the value proposition clearer.
+- A drop between `onboarding_completed` and `repo_connected` means users added their API key but didn't connect a repo — the repos page needs a stronger CTA or the flow isn't obvious.
+- A drop between `repo_connected` and `review_completed` means users connected repos but never opened a PR (or reviews are failing) — check `review_failed` events for errors.
+- Healthy target: 60%+ conversion from sign-in to first review completed.
+
+#### Report 2: Review Pipeline
+
+**Type:** Insights (Line chart, grouped by Day)
+**Metrics (each as a separate line):**
+- `review_requested` (Total) — demand: how many PRs triggered reviews
+- `review_completed` (Total) — delivery: how many reviews succeeded
+- `review_failed` (Total) — errors: how many reviews broke
+- `review_cancelled` (Total) — waste: how many reviews were abandoned
+
+**How to read it:**
+- **Healthy state:** `review_requested` and `review_completed` lines track closely. `review_failed` and `review_cancelled` stay near zero.
+- **Spike in `review_failed`:** Something broke — check Sentry for the error. Common causes: API key expired, provider outage, model rate-limited, malformed diff.
+- **Spike in `review_cancelled`:** Users are merging/closing PRs before reviews finish. The pipeline is too slow — check review duration or consider optimizing the prompt/context retrieval.
+- **Gap between `requested` and `completed`:** Some reviews are stuck or failing silently. Check Inngest dashboard for stuck jobs.
+- **`review_requested` dropping over time:** Users are disconnecting repos or churning. Cross-reference with the Retention report.
+- **`review_requested` spiking:** A user connected a high-activity repo, or a team adopted the tool. Good sign.
+
+#### Report 3: Feature Engagement
+
+**Type:** Insights (Bar chart, Last 30 days)
+**Events (all in one chart, Total count per event):**
+- `api_key_added` — new keys being configured
+- `api_key_model_changed` — users experimenting with models
+- `api_key_deleted` — users removing keys (potential churn signal)
+- `repo_connected` — repos being onboarded
+- `repo_disconnected` — repos being removed (churn signal)
+- `memory_rule_added` — users teaching the agent
+- `memory_rule_toggled` — users managing their rules
+- `memory_rule_deleted` — users cleaning up rules
+
+**How to read it:**
+- **High `api_key_model_changed`:** Users are experimenting with models — consider surfacing model comparison data or recommendations.
+- **High `repo_disconnected` relative to `repo_connected`:** Users are trying the tool and removing it — reviews aren't providing enough value. Check review quality.
+- **Low `memory_rule_added`:** Users aren't discovering the memory feature — consider prompting them after their first review or making the feature more visible.
+- **`api_key_deleted` with no `api_key_added`:** User is leaving — potential churn. If this pattern appears across multiple users, investigate review quality or UX friction.
+- **Zero across the board:** No one is using settings/features — could mean the defaults are good enough, or users aren't engaged enough to customize.
+
+#### Report 4: Active Users (DAU)
+
+**Type:** Insights (Line chart, grouped by Day)
+**Metric:** `page_viewed` → Unique Users
+
+**How to read it:**
+- Shows how many distinct users visit the dashboard each day.
+- **Steady or growing line:** Healthy adoption. Users are coming back.
+- **Declining line:** Users are churning. Cross-reference with the Retention report to confirm.
+- **Spikes:** Likely correlated with team onboarding or a marketing push. Check if the new users convert (Onboarding Funnel).
+- **Flat at 1:** Only you (the founder) are using it. Time to get more users.
+- Toggle the top bar between **Day** / **Week** / **Month** to see WAU and MAU. DAU/WAU ratio above 40% = strong stickiness for a dev tool.
+
+#### Report 5: Retention
+
+**Type:** Retention (Weekly, 4 weeks)
+**Start event:** `review_completed`
+**Return event:** `review_completed`
+
+**How to read it:**
+- Shows the % of users who got a review in Week 0 and came back for another review in Weeks 1–4.
+- **Week 1 retention 50%+:** Strong — users who try the product come back.
+- **Week 1 retention below 20%:** Users try it once and leave — the first review didn't deliver enough value. Improve review quality, reduce false positives, or add more actionable suggestions.
+- **Curve flattens (e.g., Week 2–4 stays at ~30%):** You have a core group of retained users. This is product-market fit territory. Focus on growing the top of the funnel.
+- **Curve drops to 0% by Week 4:** Nobody sticks around. Critical problem — the product isn't solving a recurring need, or the review quality degrades over time.
+- **Week 0 is always 100%** — that's the baseline cohort. Every subsequent week measures how many of them returned.
+
+### 8. Env Var Summary
 
 ```
 # Sentry (Error Tracking)

@@ -72,7 +72,7 @@ export function NavUser({ user }: NavUserProps) {
           >
             <DropdownMenuItem
               onClick={() => signOut({ redirectUrl: "/" })}
-              className="gap-2 text-destructive focus:text-destructive"
+              className="gap-2 text-destructive focus:text-black cursor-pointer"
             >
               <LogOutIcon className="size-4" />
               Sign out

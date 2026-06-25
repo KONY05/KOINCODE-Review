@@ -47,7 +47,7 @@ function providerLabel(provider: string) {
 export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ApiKeyRow | null>(null);
 
   function handleToggle(keyId: string) {
     startTransition(async () => {
@@ -75,7 +75,7 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
   function confirmDelete() {
     if (!deleteTarget) return;
     startTransition(async () => {
-      const result = await deleteApiKey(deleteTarget);
+      const result = await deleteApiKey(deleteTarget.id);
       setDeleteTarget(null);
       if (result.success) {
         router.refresh();
@@ -194,7 +194,7 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
                 <TableCell className="px-5 py-4">
                   <button
                     type="button"
-                    onClick={() => setDeleteTarget(key.id)}
+                    onClick={() => setDeleteTarget(key)}
                     disabled={isPending}
                     className="rounded-lg p-1.5 text-(--kc-text-dim) transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
@@ -211,9 +211,9 @@ export function APIKeyTable({ keys }: { keys: ApiKeyRow[] }) {
     <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+          <AlertDialogTitle>Delete {deleteTarget ? providerLabel(deleteTarget.provider) : ""} API Key</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently remove the API key. Reviews using this key will stop working until you add a new one.
+            This will permanently remove the <strong>&quot;{deleteTarget?.model}&quot;</strong> key. Reviews using this key will stop working until you add a new one.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
