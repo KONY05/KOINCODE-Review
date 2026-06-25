@@ -1,5 +1,8 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
+
 import Logo from "@/components/Logo";
 import "./globals.css";
 
@@ -10,6 +13,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body className="min-h-dvh flex flex-col items-center justify-center px-6 bg-[#0a0c10] text-[#e6e8eb]">

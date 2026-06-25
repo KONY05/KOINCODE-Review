@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { repoMemories, repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 
 const PAGE_SIZE = 25;
 const MAX_MEMORIES_PER_REPO = 50;
@@ -90,10 +92,17 @@ export async function toggleMemoryActive(
 
     if (!memory) return fail("Memory not found");
 
+    const newIsActive = !memory.isActive;
+
     await db
       .update(repoMemories)
-      .set({ isActive: !memory.isActive })
+      .set({ isActive: newIsActive })
       .where(eq(repoMemories.id, memoryId));
+
+    await trackServer(EVENTS.MEMORY_RULE_TOGGLED, user.id, {
+      repo_id: memory.repoId,
+      is_active: newIsActive,
+    });
 
     return ok(null);
   } catch (e) {
@@ -111,6 +120,8 @@ export async function deleteMemory(memoryId: string): Promise<ActionResult> {
       .where(
         and(eq(repoMemories.id, memoryId), eq(repoMemories.userId, user.id))
       );
+
+    await trackServer(EVENTS.MEMORY_RULE_DELETED, user.id);
 
     return ok(null);
   } catch (e) {
@@ -159,6 +170,11 @@ export async function addMemory(
       userId: user.id,
       rule: trimmed,
       sourceUrl: "manual",
+    });
+
+    await trackServer(EVENTS.MEMORY_RULE_ADDED, user.id, {
+      repo_id: repoId,
+      source: "manual",
     });
 
     return ok(null);

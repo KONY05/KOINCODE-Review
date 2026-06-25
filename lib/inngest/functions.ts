@@ -1,7 +1,10 @@
 import { eq, and, lt, asc, count } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 
 import { inngest } from "./client";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 import { db } from "@/lib/db";
 import {
   repos,
@@ -117,6 +120,13 @@ export const indexRepo = inngest.createFunction(
         .set({ indexingStatus: "completed" })
         .where(eq(repos.id, repoId));
 
+      if (repo) {
+        await trackServer(EVENTS.REPO_INDEXING_COMPLETED, repo.userId, {
+          repo_name: `${owner}/${name}`,
+          files_indexed: files.length,
+        });
+      }
+
       return { indexed: files.length };
     } catch (error) {
       if (repo && googleKeyId) {
@@ -135,10 +145,21 @@ export const indexRepo = inngest.createFunction(
         });
       }
 
+      Sentry.captureException(error, {
+        tags: { function: "index-repo", repoId },
+      });
+
       await db
         .update(repos)
         .set({ indexingStatus: "failed" })
         .where(eq(repos.id, repoId));
+
+      if (repo) {
+        await trackServer(EVENTS.REPO_INDEXING_FAILED, repo.userId, {
+          repo_name: `${owner}/${name}`,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
 
       throw error;
     }
@@ -530,6 +551,15 @@ export const processReview = inngest.createFunction(
       });
 
       const commentCount = reviewData.response.comments.length;
+
+      await trackServer(EVENTS.REVIEW_COMPLETED, userId, {
+        repo_name: repoFullName,
+        pr_number: prNumber,
+        model: config.model,
+        provider: config.provider,
+        comment_count: commentCount,
+      });
+
       await step.run("set-commit-status-success", async () => {
         const description =
           commentCount > 0
@@ -561,6 +591,17 @@ export const processReview = inngest.createFunction(
         commentsPosted: postedComments.length,
       };
     } catch (error) {
+      Sentry.captureException(error, {
+        tags: { function: "process-review", reviewId, repoFullName },
+        extra: { prNumber, provider: config?.provider, model: config?.model },
+      });
+
+      await trackServer(EVENTS.REVIEW_FAILED, userId, {
+        repo_name: repoFullName,
+        pr_number: prNumber,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+
       await step.run("set-commit-status-failure", async () => {
         const reason =
           error instanceof Error ? error.message : "Unknown error";
@@ -836,6 +877,11 @@ export const processCommentReply = inngest.createFunction(
         rule,
         sourceUrl,
       });
+    });
+
+    await trackServer(EVENTS.MEMORY_RULE_ADDED, userId, {
+      repo_id: repoId,
+      source: "github",
     });
 
     await step.run("confirm-on-github", async () => {

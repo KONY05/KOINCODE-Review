@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/DashboardLayout/app-sidebar";
 import { DashboardHeader } from "@/components/DashboardLayout/dashboard-header";
+import { AnalyticsProvider } from "@/components/providers/analytics-provider";
 
 export default async function DashboardLayout({
   children,
@@ -26,16 +27,18 @@ export default async function DashboardLayout({
   };
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar user={sidebarUser} />
-        <SidebarInset>
-          <DashboardHeader />
-          <div className="flex-1 overflow-auto px-6 py-8 md:px-11 md:py-10">
-            <div className="mx-auto max-w-[1180px]">{children}</div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+    <AnalyticsProvider>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar user={sidebarUser} />
+          <SidebarInset>
+            <DashboardHeader />
+            <div className="flex-1 overflow-auto px-6 py-8 md:px-11 md:py-10">
+              <div className="mx-auto max-w-[1180px]">{children}</div>
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
+    </AnalyticsProvider>
   );
 }

@@ -7,6 +7,8 @@ import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import { db } from "@/lib/db";
 import { apiKeys, keyUsageLogs } from "@/lib/db/schema";
 import { encrypt } from "@/lib/crypto";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 
 export type ApiKeyRow = {
@@ -95,6 +97,12 @@ export async function toggleApiKeyDefault(
         .update(apiKeys)
         .set({ isDefault: newDefault })
         .where(eq(apiKeys.id, keyId));
+
+      await trackServer(
+        newDefault ? EVENTS.API_KEY_ACTIVATED : EVENTS.API_KEY_DEACTIVATED,
+        dbUser.id,
+        { provider: key.provider, model: key.model }
+      );
     });
 
     return ok(null);
@@ -121,6 +129,12 @@ export async function updateApiKeyModel(
 
     await db.update(apiKeys).set({ model }).where(eq(apiKeys.id, keyId));
 
+    await trackServer(EVENTS.API_KEY_MODEL_CHANGED, dbUser.id, {
+      provider: key.provider,
+      old_model: key.model,
+      new_model: model,
+    });
+
     return ok(null);
   } catch (e) {
     return fail("Failed to update model", e);
@@ -132,9 +146,21 @@ export async function deleteApiKey(keyId: string): Promise<ActionResult> {
     const dbUser = await getAuthUser();
     if (!dbUser) return fail("Unauthorized");
 
+    const [key] = await db
+      .select({ provider: apiKeys.provider })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, dbUser.id)))
+      .limit(1);
+
     await db
       .delete(apiKeys)
       .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, dbUser.id)));
+
+    if (key) {
+      await trackServer(EVENTS.API_KEY_DELETED, dbUser.id, {
+        provider: key.provider,
+      });
+    }
 
     return ok(null);
   } catch (e) {
@@ -159,12 +185,20 @@ export async function addApiKey(data: {
       .where(eq(apiKeys.userId, dbUser.id))
       .limit(1);
 
+    const isFirstKey = existingKeys.length === 0;
+
     await db.insert(apiKeys).values({
       userId: dbUser.id,
       provider: data.provider,
       model: data.model,
       encryptedKey,
-      isDefault: existingKeys.length === 0,
+      isDefault: isFirstKey,
+    });
+
+    await trackServer(EVENTS.API_KEY_ADDED, dbUser.id, {
+      provider: data.provider,
+      model: data.model,
+      is_first_key: isFirstKey,
     });
 
     return ok(null);

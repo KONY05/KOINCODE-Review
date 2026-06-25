@@ -7,6 +7,8 @@ import { env } from "@/config/env";
 import { db } from "@/lib/db";
 import { repos, reviews } from "@/lib/db/schema";
 import { inngest } from "@/lib/inngest/client";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 
 type PullRequestAction =
   | "opened"
@@ -151,6 +153,15 @@ async function handlePullRequestClosed(payload: PullRequestPayload) {
 
   await inngest.send(events);
 
+  if (cancelled.length > 0) {
+    await trackServer(EVENTS.REVIEW_CANCELLED, repo.userId, {
+      repo_name: payload.repository.full_name,
+      pr_number: payload.number,
+      reason: payload.pull_request.merged ? "merged" : "closed",
+      cancelled_count: cancelled.length,
+    });
+  }
+
   return NextResponse.json({ cancelled: cancelled.length });
 }
 
@@ -216,6 +227,11 @@ async function handlePullRequest(payload: PullRequestPayload) {
       baseBranch: payload.pull_request.base.ref,
       repoFullName: payload.repository.full_name,
     },
+  });
+
+  await trackServer(EVENTS.REVIEW_REQUESTED, repo.userId, {
+    repo_name: payload.repository.full_name,
+    pr_number: payload.number,
   });
 
   return NextResponse.json({ reviewId: review.id });

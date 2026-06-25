@@ -10,6 +10,8 @@ import { fetchUserRepos, type GitHubRepo } from "@/lib/github/repos";
 import { createRepoWebhook, deleteRepoWebhook } from "@/lib/github/webhooks";
 import { inngest } from "@/lib/inngest/client";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 
 export type RepoWithStatus = GitHubRepo & {
   isConnected: boolean;
@@ -174,6 +176,11 @@ export async function connectRepo(
       });
     }
 
+    await trackServer(EVENTS.REPO_CONNECTED, user.id, {
+      repo_name: repo.fullName,
+      language: repo.language,
+    });
+
     return ok(null);
   } catch (e) {
     return fail("Failed to connect repository", e);
@@ -211,6 +218,10 @@ export async function disconnectRepo(
       .update(repos)
       .set({ isActive: false, disconnectedAt: new Date(), webhookId: null })
       .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)));
+
+    await trackServer(EVENTS.REPO_DISCONNECTED, user.id, {
+      repo_name: repo ? `${repo.owner}/${repo.name}` : undefined,
+    });
 
     return ok(null);
   } catch (e) {

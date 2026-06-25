@@ -17,6 +17,12 @@ const envSchema = z.object({
   PINECONE_API_KEY: z.string(),
   PINECONE_INDEX: z.string(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
+
+  NEXT_PUBLIC_SENTRY_DSN: z.string(),
+  SENTRY_ORG: z.string(),
+  SENTRY_PROJECT: z.string(),
+
+  NEXT_PUBLIC_MIXPANEL_TOKEN: z.string(),
 });
 
 export const env = envSchema.parse(process.env);
