@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 
 import {
   initMixpanelClient,
@@ -11,24 +10,31 @@ import {
 } from "@/lib/analytics/mixpanel";
 import { EVENTS } from "@/lib/analytics/events";
 
-export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLoaded } = useUser();
+type AnalyticsUser = {
+  id: string;
+  email: string;
+  name: string;
+  githubUsername: string;
+};
+
+export function AnalyticsProvider({
+  user,
+  children,
+}: {
+  user: AnalyticsUser;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const prevPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     initMixpanelClient();
-  }, []);
-
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-
     identifyUser(user.id, {
-      github_username: user.username,
-      email: user.primaryEmailAddress?.emailAddress,
-      name: user.fullName,
+      github_username: user.githubUsername,
+      email: user.email,
+      name: user.name,
     });
-  }, [isLoaded, user]);
+  }, [user]);
 
   useEffect(() => {
     if (prevPathRef.current === pathname) return;

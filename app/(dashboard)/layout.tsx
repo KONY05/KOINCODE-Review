@@ -27,7 +27,12 @@ export default async function DashboardLayout({
   };
 
   return (
-    <AnalyticsProvider>
+    <AnalyticsProvider user={{
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name ?? "",
+      githubUsername: dbUser.githubUsername ?? "",
+    }}>
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar user={sidebarUser} />
