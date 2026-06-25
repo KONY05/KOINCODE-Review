@@ -29,6 +29,7 @@ const addMemorySchema = z.object({
   repoId: z.string().min(1, "Select a repository"),
   rule: z
     .string()
+    .trim()
     .min(3, "Rule is too short")
     .max(280, "Rule cannot exceed 280 characters"),
 });
@@ -61,7 +62,6 @@ export function AddMemoryDialog({
     defaultValues: { repoId: "", rule: "" },
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const rule = watch("rule");
 
   function onSubmit(data: AddMemoryValues) {
@@ -104,7 +104,10 @@ export function AddMemoryDialog({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a repo…" />
+                <SelectValue placeholder="Select a repo…">
+                  {/* eslint-disable-next-line react-hooks/incompatible-library */}
+                  {repoOptions.find((r) => r.id === watch("repoId"))?.fullName}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {repoOptions.map((r) => (

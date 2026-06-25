@@ -30,7 +30,9 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
       ? await disconnectRepo(repo.githubId)
       : await connectRepo(repo);
 
-    if (!result.success) {
+    if (result.success) {
+      toast.success(connected ? "Repository disconnected." : "Repository connected.");
+    } else {
       setConnected(connected);
       toast.error(result.error);
     }

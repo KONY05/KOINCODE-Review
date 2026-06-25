@@ -24,10 +24,12 @@ export default function RepoMemorySection({
 }) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   function handleAdded() {
     setDialogOpen(false);
     toast.success("Memory added.");
+    setRefreshKey((k) => k + 1);
     router.refresh();
   }
 
@@ -56,6 +58,7 @@ export default function RepoMemorySection({
 
       {memories.length > 0 || totalCount > 0 ? (
         <RepoMemoryTable
+          key={refreshKey}
           initialMemories={memories}
           initialPageCount={pageCount}
           initialTotalCount={totalCount}
