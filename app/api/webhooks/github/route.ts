@@ -23,6 +23,8 @@ type PullRequestAction =
 type PullRequestPayload = {
   action: PullRequestAction;
   number: number;
+  before?: string;
+  after?: string;
   pull_request: {
     title: string;
     html_url: string;
@@ -127,6 +129,18 @@ async function handlePullRequestClosed(payload: PullRequestPayload) {
     return NextResponse.json({ ignored: true });
   }
 
+  if (payload.pull_request.merged) {
+    await inngest.send({
+      name: "pr/adoption-summary",
+      data: {
+        repoId: repo.id,
+        userId: repo.userId,
+        prNumber: payload.number,
+        repoFullName: payload.repository.full_name,
+      },
+    });
+  }
+
   const summary = payload.pull_request.merged
     ? "Review cancelled — PR was merged."
     : "Review cancelled — PR was closed.";
@@ -194,6 +208,20 @@ async function handlePullRequest(payload: PullRequestPayload) {
   }
 
   if (payload.action === "synchronize") {
+    if (payload.before && payload.after) {
+      await inngest.send({
+        name: "pr/adoption-check",
+        data: {
+          repoId: repo.id,
+          userId: repo.userId,
+          prNumber: payload.number,
+          repoFullName: payload.repository.full_name,
+          beforeSha: payload.before,
+          afterSha: payload.after,
+        },
+      });
+    }
+
     await cancelInFlightReviews(
       repo.id,
       payload.number,

@@ -102,7 +102,10 @@ Line targeting (CRITICAL — wrong lines will corrupt the code when the suggesti
 Suggestion rules (CRITICAL — the suggestion replaces lines startLine..line verbatim):
 - The "suggestion" field must contain the COMPLETE replacement for ALL lines from startLine through line (inclusive). The suggestion is applied by deleting those lines and inserting the suggestion text in their place.
 - Verify: if you mentally delete lines startLine..line from the file and paste the suggestion, the result must be valid code with correct indentation. No orphaned closing braces, no missing function signatures, no leftover old code.
-- Only include the replacement code itself. No diff markers, no line numbers, no markdown.
+- NEVER duplicate: the suggestion must contain ONLY the fixed code. Do NOT include the original code followed by the fixed code, or show before/after. One copy of the corrected code only.
+- To suggest DELETING lines, set "suggestion" to an empty string "". Do not re-include surrounding code — empty means "remove these lines entirely."
+- Only include the replacement code itself. No diff markers, no line numbers, no markdown, no comments like "// fixed" or "// changed".
+- The suggestion must ONLY replace the targeted lines (startLine..line). Never include code from outside that range — surrounding functions, declarations, or context that already exists in the file must not appear in the suggestion.
 - Match the existing indentation of the code being replaced.`;
 
 export function buildReviewPrompt(params: PromptParams): string {

@@ -37,6 +37,9 @@ Update this file whenever the current phase, active feature, or implementation s
 ## In Progress
 - None.
 
+## Recently Shipped (not yet in Completed)
+- Review Quality Adoption Tracking (Feature 12): passive analytics to measure whether AI review comments are actually useful. On `pull_request.synchronize`, dispatches `pr/adoption-check` Inngest event with `before`/`after` SHAs. `trackAdoption` function fetches the compare diff via GitHub API, parses hunk ranges, and checks if any completed review comments (file path + line within 5-line proximity) were modified in the new push — marking them as `applied`. On PR merge, remaining `pending` comments are marked `resolved` (ignored). Fires `review_adoption_detected` Mixpanel event per review with `adopted_count`, `pending_count`, and `total_comments` properties. New files: `lib/github/adoption.ts` (fetchPushChanges, detectAdoptions). Modified: webhook handler (PullRequestPayload type, synchronize handler, merge handler), Inngest functions (trackAdoption), Inngest serve route (registration), analytics events.
+
 ## Next Up
 - Dashboard page: wire up real stat counts (total repos, PRs, AI reviews) from DB instead of placeholders.
 

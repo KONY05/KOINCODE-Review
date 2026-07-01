@@ -19,6 +19,19 @@ export const reviewStatusEnum = pgEnum("review_status", [
 
 export type ReviewStatus = (typeof reviewStatusEnum.enumValues)[number];
 
+export type ReviewComment = {
+  path: string;
+  startLine?: number;
+  line: number;
+  body: string;
+  suggestion?: string;
+  suggestedDiff?: {
+    oldCode: string;
+    newCode: string;
+  };
+  status: "pending" | "adopted";
+  githubCommentId?: number;
+}
 
 export const reviews = pgTable("reviews", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -38,17 +51,3 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 });
-
-export type ReviewComment = {
-  path: string;
-  startLine?: number;
-  line: number;
-  body: string;
-  suggestion?: string;
-  suggestedDiff?: {
-    oldCode: string;
-    newCode: string;
-  };
-  status: "pending" | "applied" | "resolved";
-  githubCommentId?: number;
-}

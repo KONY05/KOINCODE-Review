@@ -7,6 +7,8 @@ import {
   cancelReview,
   processCommentReply,
   indexChangedFilesJob,
+  trackAdoption,
+  trackAdoptionSummary,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -18,5 +20,7 @@ export const { GET, POST, PUT } = serve({
     cancelReview,
     processCommentReply,
     indexChangedFilesJob,
+    trackAdoption,
+    trackAdoptionSummary,
   ],
 });

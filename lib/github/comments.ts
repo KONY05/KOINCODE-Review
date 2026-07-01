@@ -67,7 +67,7 @@ function buildReviewBody(
 function formatCommentBody(comment: ReviewComment): string {
   let body = comment.body;
 
-  if (comment.suggestion) {
+  if (comment.suggestion != null) {
     body += `\n\n\`\`\`suggestion\n${comment.suggestion}\n\`\`\``;
   }
 

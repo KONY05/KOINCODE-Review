@@ -222,6 +222,8 @@ All event names use `snake_case`. Properties follow Mixpanel conventions (`$` pr
 - `memory_rule_added` — users teaching the agent
 - `memory_rule_toggled` — users managing their rules
 - `memory_rule_deleted` — users cleaning up rules
+- `review_adoption_detected` — someone acted on a suggestion = the feature worked
+- `review_completed` — review was generated
 
 **How to read it:**
 - **High `api_key_model_changed`:** Users are experimenting with models — consider surfacing model comparison data or recommendations.
@@ -229,6 +231,43 @@ All event names use `snake_case`. Properties follow Mixpanel conventions (`$` pr
 - **Low `memory_rule_added`:** Users aren't discovering the memory feature — consider prompting them after their first review or making the feature more visible.
 - **`api_key_deleted` with no `api_key_added`:** User is leaving — potential churn. If this pattern appears across multiple users, investigate review quality or UX friction.
 - **Zero across the board:** No one is using settings/features — could mean the defaults are good enough, or users aren't engaged enough to customize.
+
+#### Report 3b: Review Quality Funnel
+
+**Type:** Funnel
+**Events (in order):** `review_completed` → `review_adoption_detected` → `review_adoption_summary`
+**Conversion window:** 30 days
+**Breakdown:** `model` (to compare quality across providers)
+
+**How to read it:**
+- **Step 1 → 2 conversion (review_completed → adoption_detected):** The % of reviews where the user modified code near at least one comment in a subsequent push. This is your primary quality signal — higher = reviews are useful.
+- **Step 2 → 3 conversion (adoption_detected → adoption_summary):** Whether those PRs were eventually merged. Should approach 100% for healthy PRs.
+- **Time to adopt (shown between steps):** How long between the review posting and the user pushing a fix. Shorter = user trusted the suggestion immediately. Longer = hesitation or the fix was complex.
+- **Breakdown by `model`:** Compare adoption rate across Anthropic, OpenAI, Google, OpenRouter. The model with the highest step 1→2 conversion is giving the most actionable reviews.
+- **Adoption rate below 30%:** Reviews are generating noise — too many low-confidence comments. Tighten the system prompt or raise the bar for what gets flagged.
+- **Adoption rate above 70%:** Reviews are high signal. Consider increasing comment volume or covering more issue categories.
+- **`review_adoption_summary` properties** (`adoption_rate`, `adopted_count`, `ignored_count`) are NOT visible in the funnel — the funnel only shows conversion counts and time between steps. To chart these values you need a separate Insights report (see Report 3c below).
+
+#### Report 3c: Adoption Rate Over Time
+
+**Type:** Insights (Line chart, grouped by Day)
+**Event:** `review_adoption_summary`
+**Metric:** Average of property `adoption_rate`
+
+This is a separate report from the funnel. Where the funnel tells you "what % of reviews had at least one adoption", this chart tells you "on average, what fraction of comments per review were adopted" — a finer-grained quality signal.
+
+**How to build it in Mixpanel:**
+1. Create a new Insights report
+2. Select event: `review_adoption_summary`
+3. Change the aggregation from `Total` to `Average` → select property `adoption_rate`
+4. Group by Day (or Week for smoother signal)
+5. Optional: add a second metric line for `adopted_count` (Average) and `ignored_count` (Average) to see the raw comment counts alongside the rate
+
+**How to read it:**
+- **Rising line over time:** Reviews are getting better — prompt changes or model improvements are working.
+- **Flat line:** Quality is stable. Fine if already high; act if it's stuck below 40%.
+- **Drop after a model/prompt change:** The change made reviews worse. Roll back or investigate which comment categories dropped.
+- **Breakdown by `model`:** Add a breakdown on `model` property to see which provider consistently delivers the highest average adoption rate across all reviews — this is your ground-truth model comparison, grounded in real user behavior.
 
 #### Report 4: Active Users (DAU)
 

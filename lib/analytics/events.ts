@@ -22,6 +22,8 @@ export const EVENTS = {
   REVIEW_COMPLETED: "review_completed",
   REVIEW_FAILED: "review_failed",
   REVIEW_CANCELLED: "review_cancelled",
+  REVIEW_ADOPTION_DETECTED: "review_adoption_detected",
+  REVIEW_ADOPTION_SUMMARY: "review_adoption_summary",
 
   // Repository Memory
   MEMORY_RULE_ADDED: "memory_rule_added",

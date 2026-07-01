@@ -22,6 +22,7 @@ import { fetchPRFiles, fetchPRDiff } from "@/lib/github/diff";
 import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
 import { postReviewComments, replyToComment } from "@/lib/github/comments";
 import { createCommitStatus } from "@/lib/github/checks";
+import { fetchPushChanges, detectAdoptions } from "@/lib/github/adoption";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
@@ -711,6 +712,186 @@ export const indexChangedFilesJob = inngest.createFunction(
     }
 
     return { status: "indexed", files: filesIndexed };
+  }
+);
+
+export const trackAdoption = inngest.createFunction(
+  {
+    id: "track-adoption",
+    retries: 2,
+    triggers: [{ event: "pr/adoption-check" }],
+  },
+  async ({ event, step }) => {
+    const {
+      repoId,
+      userId,
+      prNumber,
+      repoFullName,
+      beforeSha,
+      afterSha,
+    } = event.data;
+
+    const [owner, repoName] = repoFullName.split("/");
+
+    const reviewsWithPendingComments = await step.run(
+      "load-pending-reviews",
+      async () => {
+        const completedReviews = await db
+          .select({ id: reviews.id, comments: reviews.comments })
+          .from(reviews)
+          .where(
+            and(
+              eq(reviews.repoId, repoId),
+              eq(reviews.prNumber, prNumber),
+              eq(reviews.status, "completed")
+            )
+          );
+
+        return completedReviews.filter((r) =>
+          r.comments?.some((c) => c.status === "pending")
+        );
+      }
+    );
+
+    if (reviewsWithPendingComments.length === 0) {
+      return { status: "skipped", reason: "no-pending-comments" };
+    }
+
+    const githubToken = await step.run("get-github-token", async () => {
+      const [user] = await db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!user) return null;
+
+      const client = await clerkClient();
+      const response = await client.users.getUserOauthAccessToken(
+        user.clerkId,
+        "github"
+      );
+
+      return response.data[0]?.token ?? null;
+    });
+
+    if (!githubToken) return { status: "skipped", reason: "no-token" };
+
+    const pushChanges = await step.run("fetch-push-changes", async () => {
+      return fetchPushChanges(
+        githubToken,
+        owner,
+        repoName,
+        beforeSha,
+        afterSha
+      );
+    });
+
+    if (pushChanges.length === 0) {
+      return { status: "skipped", reason: "no-file-changes" };
+    }
+
+    const totalAdopted = await step.run(
+      "detect-and-update-adoptions",
+      async () => {
+        let adopted = 0;
+
+        for (const review of reviewsWithPendingComments) {
+          const comments = review.comments!;
+          const pendingComments = comments
+            .map((c, i) => ({ path: c.path, line: c.line, index: i }))
+            .filter((_, i) => comments[i].status === "pending");
+
+          const { adopted: adoptedIndices } = detectAdoptions(
+            pendingComments,
+            pushChanges
+          );
+
+          if (adoptedIndices.length === 0) continue;
+
+          const updatedComments = comments.map((c, i) =>
+            adoptedIndices.includes(i)
+              ? { ...c, status: "adopted" as const }
+              : c
+          );
+
+          await db
+            .update(reviews)
+            .set({ comments: updatedComments })
+            .where(eq(reviews.id, review.id));
+
+          adopted += adoptedIndices.length;
+
+          await trackServer(EVENTS.REVIEW_ADOPTION_DETECTED, userId, {
+            review_id: review.id,
+            repo_name: repoFullName,
+            pr_number: prNumber,
+            adopted_count: adoptedIndices.length,
+            pending_count: updatedComments.filter(
+              (c) => c.status === "pending"
+            ).length,
+            total_comments: updatedComments.length,
+          });
+        }
+
+        return adopted;
+      }
+    );
+
+    return { status: "checked", totalAdopted };
+  }
+);
+
+export const trackAdoptionSummary = inngest.createFunction(
+  {
+    id: "track-adoption-summary",
+    retries: 2,
+    triggers: [{ event: "pr/adoption-summary" }],
+  },
+  async ({ event, step }) => {
+    const { repoId, userId, prNumber, repoFullName } = event.data;
+
+    const completedReviews = await step.run(
+      "load-completed-reviews",
+      async () => {
+        return db
+          .select({ id: reviews.id, comments: reviews.comments })
+          .from(reviews)
+          .where(
+            and(
+              eq(reviews.repoId, repoId),
+              eq(reviews.prNumber, prNumber),
+              eq(reviews.status, "completed")
+            )
+          );
+      }
+    );
+
+    if (completedReviews.length === 0) {
+      return { status: "skipped", reason: "no-completed-reviews" };
+    }
+
+    await step.run("track-summaries", async () => {
+      for (const review of completedReviews) {
+        const comments = review.comments ?? [];
+        if (comments.length === 0) continue;
+
+        const adopted = comments.filter((c) => c.status === "adopted").length;
+        const pending = comments.filter((c) => c.status === "pending").length;
+
+        await trackServer(EVENTS.REVIEW_ADOPTION_SUMMARY, userId, {
+          review_id: review.id,
+          repo_name: repoFullName,
+          pr_number: prNumber,
+          total_comments: comments.length,
+          adopted_count: adopted,
+          ignored_count: pending,
+          adoption_rate: adopted / comments.length,
+        });
+      }
+    });
+
+    return { status: "tracked", reviews: completedReviews.length };
   }
 );
 
