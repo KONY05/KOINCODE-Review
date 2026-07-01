@@ -1,4 +1,7 @@
-# KOINCODE-Review
+<p align="center">
+  <img src="public/logo.png" alt="KOINCODE Review" />
+</p>
+
 
 An open-source AI-powered code review agent. Connect your GitHub repos, bring your own LLM API key, and get automated reviews with fix suggestions on every pull request.
 
