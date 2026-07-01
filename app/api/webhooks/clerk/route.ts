@@ -1,5 +1,6 @@
 import { Webhook } from "svix";
 import { NextRequest, NextResponse } from "next/server";
+
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { env } from "@/config/env";
