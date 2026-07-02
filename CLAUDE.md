@@ -56,6 +56,9 @@ ENCRYPTION_KEY=                       # AES-256-GCM key for encrypting user API 
 
 # Embeddings (platform-owned, not user-provided)
 GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for gemini-embedding-2 (free tier)
+
+# AI Eval (Braintrust)
+BRAINTRUST_API_KEY=                    # Braintrust project API key — logs review generations and scores; optional, no-ops when unset
 ```
 
 ## Architecture

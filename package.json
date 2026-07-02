@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "inngest:dev": "npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest"
+    "inngest:dev": "npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest",
+    "eval": "braintrust eval evals --env-file .env.local"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.85",
@@ -30,6 +31,8 @@
     "@sentry/nextjs": "^10.60.0",
     "@tanstack/react-table": "^8.21.3",
     "ai": "^6.0.208",
+    "autoevals": "^0.3.0",
+    "braintrust": "^3.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -59,6 +62,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "openai": "^6.45.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

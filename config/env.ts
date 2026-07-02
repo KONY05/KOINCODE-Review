@@ -22,6 +22,8 @@ const envSchema = z.object({
   SENTRY_PROJECT: z.string(),
 
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string(),
+
+  BRAINTRUST_API_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

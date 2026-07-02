@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { inngest } from "./client";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
+import { logReviewGeneration, logAdoptionScore } from "@/lib/analytics/braintrust";
 import { db } from "@/lib/db";
 import {
   repos,
@@ -466,6 +467,22 @@ export const processReview = inngest.createFunction(
             status: "success",
           });
 
+          await logReviewGeneration({
+            reviewId,
+            prTitle,
+            diff,
+            repoMemories: memories.map((m) => m.rule),
+            fileCount: prFiles.length,
+            response: result.response,
+            provider: config.provider,
+            model: config.model,
+            repoId,
+            prNumber,
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            durationMs: result.durationMs,
+          });
+
           const patches = Object.fromEntries(
             prFiles
               .filter((f) => f.patch)
@@ -878,6 +895,8 @@ export const trackAdoptionSummary = inngest.createFunction(
 
         const adopted = comments.filter((c) => c.status === "adopted").length;
         const pending = comments.filter((c) => c.status === "pending").length;
+
+        await logAdoptionScore(review.id, adopted / comments.length);
 
         await trackServer(EVENTS.REVIEW_ADOPTION_SUMMARY, userId, {
           review_id: review.id,
