@@ -1,6 +1,6 @@
-import Logo from "@/components/Logo";
 import { AuthenticateWithRedirectCallback } from "@clerk/nextjs";
 
+import Logo from "@/components/Logo";
 import { SignInTracker } from "./sign-in-tracker";
 
 export default function SSOCallbackPage() {
