@@ -131,6 +131,68 @@ export function mapDiffLineToPosition(
 }
 
 /**
+ * Extracts the current-file (post-change) line contents for a range from a
+ * unified diff patch, using the same walking logic as mapDiffLineToPosition.
+ * Returns null if any line in the range doesn't appear in the patch.
+ */
+function extractPatchLines(
+  patch: string,
+  startLine: number,
+  endLine: number
+): string[] | null {
+  const lines = patch.split("\n");
+  let currentLine = 0;
+  const collected: string[] = [];
+
+  for (const line of lines) {
+    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunkMatch) {
+      currentLine = parseInt(hunkMatch[1], 10) - 1;
+      continue;
+    }
+
+    if (line.startsWith("-")) {
+      continue;
+    }
+
+    if (line.startsWith("+") || !line.startsWith("\\")) {
+      currentLine++;
+      if (currentLine >= startLine && currentLine <= endLine) {
+        collected.push(line.slice(1));
+      }
+    }
+  }
+
+  const expectedCount = endLine - startLine + 1;
+  return collected.length === expectedCount ? collected : null;
+}
+
+/**
+ * Checks whether a suggestion is a no-op — i.e. identical (modulo trailing
+ * whitespace) to the code it claims to replace. Used to drop broken
+ * "Apply suggestion" buttons that echo back the existing code instead of
+ * fixing it.
+ */
+function isNoOpSuggestion(
+  patch: string,
+  startLine: number,
+  endLine: number,
+  suggestion: string
+): boolean {
+  const originalLines = extractPatchLines(patch, startLine, endLine);
+  if (!originalLines) return false;
+
+  const normalize = (text: string) =>
+    text
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .join("\n")
+      .trim();
+
+  return normalize(originalLines.join("\n")) === normalize(suggestion);
+}
+
+/**
  * Posts all review comments to a GitHub PR as a single atomic review.
  *
  * For each comment, looks up the file's patch from `patches`, converts the
@@ -173,11 +235,24 @@ export async function postReviewComments(
     const position = mapDiffLineToPosition(patch, comment.line);
     if (!position) continue;
 
+    let suggestion = comment.suggestion;
+    if (
+      suggestion != null &&
+      isNoOpSuggestion(
+        patch,
+        comment.startLine ?? comment.line,
+        comment.line,
+        suggestion
+      )
+    ) {
+      suggestion = undefined;
+    }
+
     const entry: (typeof reviewComments)[number] = {
       path: comment.path,
       line: comment.line,
       side: "RIGHT" as const,
-      body: formatCommentBody(comment),
+      body: formatCommentBody({ ...comment, suggestion }),
     };
 
     if (comment.startLine && comment.startLine < comment.line) {

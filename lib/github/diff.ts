@@ -63,3 +63,26 @@ export async function fetchPRDiff(
 
   return data as unknown as string;
 }
+
+/**
+ * Fetches the PR's current head SHA. Called alongside fetchPRFiles/fetchPRDiff
+ * so a review run has one commit it can pin file-content fetches, commit
+ * statuses, and posted comments to — instead of trusting a SHA captured
+ * earlier from a webhook payload, which may no longer be the head.
+ */
+export async function fetchPRHeadSha(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<string> {
+  const octokit = new Octokit({ auth: token });
+
+  const { data } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+
+  return data.head.sha;
+}

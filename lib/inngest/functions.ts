@@ -18,7 +18,7 @@ import { decrypt } from "@/lib/crypto";
 import { fetchRepoTree } from "@/lib/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
-import { fetchPRFiles, fetchPRDiff } from "@/lib/github/diff";
+import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/github/diff";
 import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
 import { postReviewComments, replyToComment } from "@/lib/github/comments";
 import { createCommitStatus } from "@/lib/github/checks";
@@ -373,9 +373,10 @@ export const processReview = inngest.createFunction(
       const reviewData = await step.run("run-review", async () => {
         if (!(await isReviewStillActive(reviewId))) return null;
 
-        const [prFiles, diff] = await Promise.all([
+        const [prFiles, diff, reviewSha] = await Promise.all([
           fetchPRFiles(githubToken, owner, repoName, prNumber),
           fetchPRDiff(githubToken, owner, repoName, prNumber),
+          fetchPRHeadSha(githubToken, owner, repoName, prNumber),
         ]);
 
         const reviewableFiles = prFiles
@@ -387,7 +388,7 @@ export const processReview = inngest.createFunction(
           owner,
           repoName,
           reviewableFiles,
-          headSha
+          reviewSha
         );
 
         const memories = await db
@@ -476,6 +477,7 @@ export const processReview = inngest.createFunction(
             response: result.response,
             patches,
             reviewedFiles: reviewableFiles,
+            reviewSha,
           };
         } catch (error) {
           await logKeyUsage({
@@ -500,6 +502,17 @@ export const processReview = inngest.createFunction(
         return { status: "cancelled", reviewId };
       }
 
+      const stillActiveBeforePost = await step.run(
+        "check-still-active-before-post",
+        async () => {
+          return isReviewStillActive(reviewId);
+        }
+      );
+
+      if (!stillActiveBeforePost) {
+        return { status: "cancelled", reviewId };
+      }
+
       const postedComments = await step.run("post-comments", async () => {
         const patches = new Map(Object.entries(reviewData.patches));
 
@@ -509,7 +522,7 @@ export const processReview = inngest.createFunction(
             owner,
             repoName,
             prNumber,
-            headSha,
+            reviewData.reviewSha,
             reviewData.response.comments,
             patches,
             {
@@ -567,10 +580,16 @@ export const processReview = inngest.createFunction(
             ? `Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`
             : "No issues found";
 
-        await createCommitStatus(githubToken, owner, repoName, headSha, {
-          state: "success",
-          description,
-        });
+        await createCommitStatus(
+          githubToken,
+          owner,
+          repoName,
+          reviewData.reviewSha,
+          {
+            state: "success",
+            description,
+          }
+        );
       });
 
       await step.sendEvent("dispatch-index-changed-files", {
@@ -580,7 +599,7 @@ export const processReview = inngest.createFunction(
           userId,
           reviewId,
           repoFullName,
-          headSha,
+          headSha: reviewData.reviewSha,
           filePaths: reviewData.reviewedFiles,
           apiKeyId: config.apiKeyId,
         },
