@@ -17,10 +17,26 @@ const reviewResponseSchema = z.object({
   comments: z.array(
     z.object({
       path: z.string(),
-      startLine: z.number().optional(),
-      line: z.number(),
-      body: z.string(),
-      suggestion: z.string().optional(),
+      startLine: z
+        .number()
+        .optional()
+        .describe(
+          "First line of the problematic range. Omit for single-line issues. Must point to the actual problematic code — never a surrounding function/class/block declaration."
+        ),
+      line: z
+        .number()
+        .describe(
+          "Last line of the problematic range (or the single line, if startLine is omitted). Counted from the numbered Full File Contents section."
+        ),
+      body: z
+        .string()
+        .describe("Explanation of the issue. Be specific and actionable."),
+      suggestion: z
+        .string()
+        .optional()
+        .describe(
+          "Complete replacement for lines startLine..line inclusive, and nothing else. Must contain ONLY the corrected code — never the original code, never both original and fixed, never lines outside startLine..line. Empty string means delete the range entirely. Omit if there's no code fix to suggest."
+        ),
     })
   ),
 });
