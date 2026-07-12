@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sso-callback",
+  "/cli-auth", // handles its own signed-in/signed-out branching, same as "/" and "/sso-callback"
   "/api/webhooks(.*)",
   "/api/inngest",
+  "/api/cli(.*)", // device-auth routes have no Clerk session yet; repo routes use their own Bearer CLI token
   "/monitoring",
 ]);
 

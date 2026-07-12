@@ -52,3 +52,37 @@ export async function fetchUserRepos(
 
   return { repos, hasNextPage };
 }
+
+/** Resolves a single repo by owner/name — used by the CLI connect route, which
+ * only has a git remote's `owner/repo` to go on, not a pre-fetched list. */
+export async function fetchRepoByFullName(
+  token: string,
+  owner: string,
+  repo: string
+): Promise<GitHubRepo | null> {
+  const octokit = new Octokit({ auth: token });
+
+  try {
+    const response = await octokit.repos.get({ owner, repo });
+    const data = response.data;
+
+    return {
+      githubId: data.id,
+      name: data.name,
+      fullName: data.full_name,
+      owner: data.owner.login,
+      description: data.description,
+      language: data.language,
+      stargazersCount: data.stargazers_count,
+      isPrivate: data.private,
+      defaultBranch: data.default_branch,
+      updatedAt: data.updated_at ?? new Date().toISOString(),
+      htmlUrl: data.html_url,
+    };
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
+      return null;
+    }
+    throw e;
+  }
+}

@@ -7,8 +7,7 @@ import { repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
 import { getGithubToken } from "@/lib/github";
 import { fetchUserRepos, type GitHubRepo } from "@/lib/github/repos";
-import { createRepoWebhook, deleteRepoWebhook } from "@/lib/github/webhooks";
-import { inngest } from "@/lib/inngest/client";
+import { connectRepoForUser, disconnectRepoForUser } from "@/lib/repos";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
@@ -24,7 +23,7 @@ type ListReposData = {
 
 export async function listGithubRepos(
   page: number = 1,
-  perPage: number = 20
+  perPage: number = 20,
 ): Promise<ActionResult<ListReposData>> {
   try {
     const user = await getAuthUser();
@@ -36,7 +35,7 @@ export async function listGithubRepos(
     const { repos: githubRepos, hasNextPage } = await fetchUserRepos(
       token,
       page,
-      perPage
+      perPage,
     );
 
     const connectedRepos = await db
@@ -60,7 +59,7 @@ export async function listGithubRepos(
 export async function listConnectedRepos(
   page: number = 1,
   perPage: number = 20,
-  search?: string
+  search?: string,
 ): Promise<ActionResult<ListReposData>> {
   try {
     const user = await getAuthUser();
@@ -100,15 +99,11 @@ export async function listConnectedRepos(
 
     return ok({ repos: reposWithStatus, hasNextPage });
   } catch (e) {
-    return fail(
-      "Failed to fetch connected repositories", e
-    );
+    return fail("Failed to fetch connected repositories", e);
   }
 }
 
-export async function connectRepo(
-  repo: GitHubRepo
-): Promise<ActionResult> {
+export async function connectRepo(repo: GitHubRepo): Promise<ActionResult> {
   try {
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
@@ -116,69 +111,12 @@ export async function connectRepo(
     const token = await getGithubToken();
     if (!token) return fail("GitHub token not found");
 
-    const result = await db.transaction(async (tx) => {
-      const [upserted] = await tx
-        .insert(repos)
-        .values({
-          userId: user.id,
-          githubId: repo.githubId,
-          fullName: repo.fullName,
-          name: repo.name,
-          owner: repo.owner,
-          defaultBranch: repo.defaultBranch,
-          isPrivate: repo.isPrivate,
-          isActive: true,
-          indexingStatus: "pending",
-          disconnectedAt: null,
-        })
-        .onConflictDoUpdate({
-          target: [repos.userId, repos.githubId],
-          set: {
-            isActive: true,
-            disconnectedAt: null,
-            fullName: repo.fullName,
-            name: repo.name,
-            defaultBranch: repo.defaultBranch,
-            isPrivate: repo.isPrivate,
-          },
-        })
-        .returning({
-          id: repos.id,
-          indexingStatus: repos.indexingStatus,
-          webhookId: repos.webhookId,
-        });
-
-      if (!upserted.webhookId) {
-        const webhookId = await createRepoWebhook(
-          token,
-          repo.owner,
-          repo.name
-        );
-        await tx
-          .update(repos)
-          .set({ webhookId })
-          .where(eq(repos.id, upserted.id));
-      }
-
-      return upserted;
-    });
-
-    if (result.indexingStatus !== "completed") {
-      await inngest.send({
-        name: "repo/connected",
-        data: {
-          repoId: result.id,
-          owner: repo.owner,
-          name: repo.name,
-          defaultBranch: repo.defaultBranch,
-          githubToken: token,
-        },
-      });
-    }
+    await connectRepoForUser(user.id, repo, token);
 
     await trackServer(EVENTS.REPO_CONNECTED, user.id, {
       repo_name: repo.fullName,
       language: repo.language,
+      source: "dashboard",
     });
 
     return ok(null);
@@ -187,46 +125,21 @@ export async function connectRepo(
   }
 }
 
-export async function disconnectRepo(
-  githubId: number
-): Promise<ActionResult> {
+export async function disconnectRepo(githubId: number): Promise<ActionResult> {
   try {
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
 
     const token = await getGithubToken();
-
-    const [repo] = await db
-      .select({
-        webhookId: repos.webhookId,
-        owner: repos.owner,
-        name: repos.name,
-      })
-      .from(repos)
-      .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)))
-      .limit(1);
-
-    if (repo?.webhookId && token) {
-      try {
-        await deleteRepoWebhook(token, repo.owner, repo.name, repo.webhookId);
-      } catch (e) {
-        console.error("Failed to delete webhook:", e);
-      }
-    }
-
-    await db
-      .update(repos)
-      .set({ isActive: false, disconnectedAt: new Date(), webhookId: null })
-      .where(and(eq(repos.userId, user.id), eq(repos.githubId, githubId)));
+    const repo = await disconnectRepoForUser(user.id, githubId, token);
 
     await trackServer(EVENTS.REPO_DISCONNECTED, user.id, {
       repo_name: repo ? `${repo.owner}/${repo.name}` : undefined,
+      source: "dashboard",
     });
 
     return ok(null);
   } catch (e) {
-    return fail(
-      "Failed to disconnect repository", e
-    );
+    return fail("Failed to disconnect repository", e);
   }
 }

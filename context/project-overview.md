@@ -12,6 +12,7 @@ KOINCODE-Review is an AI-powered code review agent — a self-hosted alternative
 6. Store repository context in a vector store so the reviewer understands the broader codebase.
 7. Provide a dashboard where users manage connected repos, review history, and API keys.
 8. Process reviews asynchronously via background jobs so the UI stays responsive.
+9. Let a companion CLI tool (KOINCODE) pair with a user's account via a browser-based device-auth flow and connect/disconnect repos on their behalf, so the primary onboarding path doesn't have to be the web dashboard.
 
 ## Core User Flow
 1. User visits the landing page and clicks the login button, which triggers GitHub OAuth directly (Clerk).
@@ -53,6 +54,11 @@ KOINCODE-Review is an AI-powered code review agent — a self-hosted alternative
 - Recent review history with status
 - Review detail view (comments, fixes, outcomes)
 
+### CLI Integration
+- Browser-based device-authorization pairing (`/api/cli/device`, `/api/cli/device/token`) — no manually-generated tokens, no new sign-in UI beyond the existing GitHub OAuth
+- Bearer-token-authenticated API for connecting/disconnecting a repo by GitHub `owner/repo` name, reusing the same connect/disconnect logic the dashboard uses
+- See `context/feature-spec/14-cli-integration-auth.md`
+
 ### Background Processing
 - Async PR review via Inngest background jobs
 - Webhook event ingestion and queuing
@@ -75,8 +81,10 @@ KOINCODE-Review is an AI-powered code review agent — a self-hosted alternative
 - Billing / subscription management
 - Team or organization-level accounts
 - Real-time chat with the reviewer agent
-- IDE extensions or CLI tools
+- IDE extensions
 - Self-hosted deployment guides
+
+CLI tools were previously listed here as out of scope — narrowed, not reversed: KOINCODE-Review does not ship its own CLI, but does expose a minimal token-based API (`/api/cli/*`) so the separate KOINCODE terminal app can pair an account and connect/disconnect repos. See `context/feature-spec/14-cli-integration-auth.md`.
 
 ## Success Criteria
 1. A user can sign in, add an API key, connect a repo, and receive an automated review on their next PR — end to end.
