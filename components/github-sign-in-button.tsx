@@ -4,7 +4,14 @@ import { useClerk } from "@clerk/nextjs";
 
 import GitHubIcon from "@/components/icon/GithubIcon";
 
-export function GitHubSignInButton() {
+type Props = {
+  /** Where Clerk lands the user after OAuth completes. Defaults to the
+   * dashboard; the /cli-auth page overrides this to loop back to itself
+   * (with its device_code intact) instead of losing that context to /dashboard. */
+  redirectUrlComplete?: string;
+};
+
+export function GitHubSignInButton({ redirectUrlComplete = "/dashboard" }: Props) {
   const clerk = useClerk();
 
   const handleClick = async () => {
@@ -12,7 +19,7 @@ export function GitHubSignInButton() {
     await clerk.client.signIn.authenticateWithRedirect({
       strategy: "oauth_github",
       redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/dashboard",
+      redirectUrlComplete,
     });
   };
 

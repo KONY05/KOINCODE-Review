@@ -1,10 +1,9 @@
 import { CheckIcon } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { GitHubSignInButton } from "@/components/Landing/github-sign-in-button";
+import { GitHubSignInButton } from "@/components/github-sign-in-button";
 import LockIcon from "@/components/icon/LockIcon";
 import Logo from "@/components/Logo";
-
 
 export default function LandingPage() {
   return (
@@ -46,7 +45,6 @@ export default function LandingPage() {
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Right — Login */}
