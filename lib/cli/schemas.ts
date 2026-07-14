@@ -13,3 +13,9 @@ export const repoRefSchema = z.object({
 export const deviceTokenPollSchema = z.object({
   deviceCode: z.string().min(1).max(200),
 });
+
+export const keySyncSchema = z.object({
+  provider: z.enum(["anthropic", "openai", "google", "openrouter"]),
+  model: z.string().min(1),
+  apiKey: z.string().min(1),
+});
