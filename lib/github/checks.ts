@@ -8,7 +8,7 @@ type CommitStatusParams = {
   targetUrl?: string;
 };
 
-const STATUS_CONTEXT = "Koincode Review";
+const STATUS_CONTEXT = "KOINCODE Review";
 
 export async function createCommitStatus(
   token: string,

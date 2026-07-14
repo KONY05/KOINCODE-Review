@@ -12,13 +12,13 @@ export const PROVIDERS: readonly ProviderConfig[] = [
     id: "anthropic",
     label: "Anthropic",
     tag: "Claude",
-    models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+    models: ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5","claude-sonnet-4-6"],
   },
   {
     id: "openai",
     label: "OpenAI",
     tag: "GPT",
-    models: ["gpt-5.5", "gpt-5-mini", "gpt-5-4"],
+    models: ["gpt-5.6-sol", "gpt-5.6-terra","gpt-5.6-luna", "gpt-5.5", "gpt-5-mini", "gpt-5-4"],
   },
   {
     id: "google",
@@ -39,10 +39,12 @@ export const PROVIDERS: readonly ProviderConfig[] = [
     models: [
       "z-ai/glm-5.2",
       "moonshotai/kimi-k2.7-code",
-      "qwen/qwen3.7-plus",
+      "qwen/qwen3.7-max",
       "deepseek/deepseek-v4-pro",
+      // FREE OPENROUTER MODELS
       "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "openrouter/owl-alpha"
+      "google/gemma-4-31b-it:free",
+      "poolside/laguna-xs-2.1:free"
     ],
   },
 ] as const;
