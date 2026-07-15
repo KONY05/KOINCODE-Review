@@ -79,26 +79,40 @@ export async function runReview(params: RunReviewParams): Promise<ReviewResult> 
 
   const startTime = Date.now();
 
-  const result = await generateText({
-    model: llmProvider(params.model),
-    output: Output.object({ schema: reviewResponseSchema }),
-    system: REVIEW_SYSTEM_PROMPT,
-    prompt: userPrompt,
-    maxOutputTokens: 4096,
-  });
+  let output: ReviewResponse;
+  let usage: { inputTokens: number; outputTokens: number };
+  try {
+    const result = await generateText({
+      model: llmProvider(params.model),
+      output: Output.object({ schema: reviewResponseSchema }),
+      system: REVIEW_SYSTEM_PROMPT,
+      prompt: userPrompt,
+      maxOutputTokens: 16384,
+    });
+
+    output = result.output;
+    usage = {
+      inputTokens: result.usage?.inputTokens ?? 0,
+      outputTokens: result.usage?.outputTokens ?? 0,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AI_NoOutputGeneratedError") {
+      throw new Error(
+        "LLM did not return valid structured output (likely truncated or malformed JSON, or a provider/stream error). Try a model with a larger output limit."
+      );
+    }
+    throw error;
+  }
 
   const durationMs = Date.now() - startTime;
 
-  if (!result.output) {
+  if (!output) {
     throw new Error("LLM returned no structured output");
   }
 
   return {
-    response: result.output,
-    usage: {
-      inputTokens: result.usage?.inputTokens ?? 0,
-      outputTokens: result.usage?.outputTokens ?? 0,
-    },
+    response: output,
+    usage,
     durationMs,
   };
 }
