@@ -31,6 +31,7 @@ export const EVENTS = {
   MEMORY_RULE_TOGGLED: "memory_rule_toggled",
 
   // CLI Connections
+  CLI_TOKEN_CONNECTED: "cli_token_connected",
   CLI_TOKEN_REVOKED: "cli_token_revoked",
 
   // Navigation

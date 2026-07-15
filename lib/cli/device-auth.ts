@@ -3,6 +3,8 @@ import { eq, lt, and } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { cliTokens, pendingDeviceAuth } from "@/lib/db/schema";
+import { trackServer } from "@/lib/analytics/mixpanel-server";
+import { EVENTS } from "@/lib/analytics/events";
 
 const DEVICE_CODE_TTL_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_SECONDS = 3;
@@ -147,6 +149,8 @@ export async function pollAndExchangeDeviceAuth(
     // defensively, the row came back with no userId) — already exchanged.
     return { status: "expired" };
   }
+
+  await trackServer(EVENTS.CLI_TOKEN_CONNECTED, result.userId);
 
   return { status: "approved", token: result.token, userId: result.userId };
 }
