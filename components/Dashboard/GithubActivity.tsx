@@ -32,7 +32,7 @@ export default function GithubActivity({
 }) {
   const { resolvedTheme } = useTheme();
 
-  if (!calendar) {
+  if (!calendar || resolvedTheme === undefined) {
     return (
       <div className="mt-6 rounded-2xl border border-(--kc-border-subtle) bg-card p-7">
         <h3 className="text-[17px] font-semibold">Contribution Activity</h3>
@@ -41,9 +41,11 @@ export default function GithubActivity({
         </p>
         <div className="mt-6 flex flex-col items-center gap-4">
           <Skeleton className="h-[120px] w-full max-w-[700px] rounded-xl" />
-          <p className="text-[13px] text-(--kc-text-dim)">
-            Connect your GitHub account to start tracking activity
-          </p>
+          {!calendar && (
+            <p className="text-[13px] text-(--kc-text-dim)">
+              Connect your GitHub account to start tracking activity
+            </p>
+          )}
         </div>
       </div>
     );
