@@ -222,6 +222,8 @@ All event names use `snake_case`. Properties follow Mixpanel conventions (`$` pr
 - `memory_rule_added` — users teaching the agent
 - `memory_rule_toggled` — users managing their rules
 - `memory_rule_deleted` — users cleaning up rules
+- `cli_token_connected` — a CLI device completed `/review-login`
+- `cli_token_revoked` — users disconnecting a CLI device
 - `review_adoption_detected` — someone acted on a suggestion = the feature worked
 - `review_completed` — review was generated
 
@@ -230,6 +232,7 @@ All event names use `snake_case`. Properties follow Mixpanel conventions (`$` pr
 - **High `repo_disconnected` relative to `repo_connected`:** Users are trying the tool and removing it — reviews aren't providing enough value. Check review quality.
 - **Low `memory_rule_added`:** Users aren't discovering the memory feature — consider prompting them after their first review or making the feature more visible.
 - **`api_key_deleted` with no `api_key_added`:** User is leaving — potential churn. If this pattern appears across multiple users, investigate review quality or UX friction.
+- **High `cli_token_revoked` relative to `cli_token_connected`:** Users are disconnecting CLI devices about as fast as they connect them — could be routine cleanup (lost laptop, rotating machines) or CLI-specific friction. Cross-reference with support/feedback before assuming churn.
 - **Zero across the board:** No one is using settings/features — could mean the defaults are good enough, or users aren't engaged enough to customize.
 
 #### Report 3b: Review Quality Funnel
