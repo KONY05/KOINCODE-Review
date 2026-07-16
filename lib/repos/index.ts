@@ -2,9 +2,9 @@ import { eq, and, desc } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { repos, reviews } from "@/lib/db/schema";
-import { createRepoWebhook, deleteRepoWebhook } from "@/lib/github/webhooks";
+import { getProvider } from "@/lib/providers/registry";
 import { inngest } from "@/lib/inngest/client";
-import type { GitHubRepo } from "@/lib/github/repos";
+import type { GitProviderId, RemoteRepo } from "@/lib/providers/types";
 
 // Shared connect/disconnect tail, used by both the dashboard's server actions
 // (lib/actions/repos.ts, which resolve the user via a Clerk session) and the
@@ -17,7 +17,8 @@ import type { GitHubRepo } from "@/lib/github/repos";
 
 export async function connectRepoForUser(
   userId: string,
-  repo: GitHubRepo,
+  provider: GitProviderId,
+  repo: RemoteRepo,
   token: string,
 ): Promise<{ id: string; indexingStatus: string }> {
   const result = await db.transaction(async (tx) => {
@@ -25,7 +26,8 @@ export async function connectRepoForUser(
       .insert(repos)
       .values({
         userId,
-        githubId: repo.githubId,
+        provider,
+        externalId: repo.externalId,
         fullName: repo.fullName,
         name: repo.name,
         owner: repo.owner,
@@ -36,7 +38,7 @@ export async function connectRepoForUser(
         disconnectedAt: null,
       })
       .onConflictDoUpdate({
-        target: [repos.userId, repos.githubId],
+        target: [repos.userId, repos.provider, repos.externalId],
         set: {
           isActive: true,
           disconnectedAt: null,
@@ -53,7 +55,7 @@ export async function connectRepoForUser(
       });
 
     if (!upserted.webhookId) {
-      const webhookId = await createRepoWebhook(
+      const webhookId = await getProvider(provider).createRepoWebhook(
         token,
         repo.owner,
         repo.name,
@@ -85,7 +87,8 @@ export async function connectRepoForUser(
 
 export async function disconnectRepoForUser(
   userId: string,
-  githubId: number,
+  provider: GitProviderId,
+  externalId: string,
   token: string | null,
 ): Promise<{ owner: string; name: string } | null> {
   // Wrapped in a transaction, mirroring connectRepoForUser's shape above —
@@ -97,7 +100,13 @@ export async function disconnectRepoForUser(
     const [repo] = await tx
       .update(repos)
       .set({ isActive: false, disconnectedAt: new Date(), webhookId: null })
-      .where(and(eq(repos.userId, userId), eq(repos.githubId, githubId)))
+      .where(
+        and(
+          eq(repos.userId, userId),
+          eq(repos.provider, provider),
+          eq(repos.externalId, externalId),
+        ),
+      )
       .returning({
         webhookId: repos.webhookId,
         owner: repos.owner,
@@ -112,7 +121,12 @@ export async function disconnectRepoForUser(
     // using the webhookId that came back atomically from the UPDATE itself.
     if (repo.webhookId && token) {
       try {
-        await deleteRepoWebhook(token, repo.owner, repo.name, repo.webhookId);
+        await getProvider(provider).deleteRepoWebhook(
+          token,
+          repo.owner,
+          repo.name,
+          repo.webhookId,
+        );
       } catch (e) {
         console.error("Failed to delete webhook:", e);
       }
@@ -122,16 +136,16 @@ export async function disconnectRepoForUser(
   });
 }
 
-/** Looked up by (owner, name) rather than githubId — the CLI only has a git
+/** Looked up by (owner, name) rather than externalId — the CLI only has a git
  * remote's owner/repo to go on, and going through the DB here avoids an extra
- * GitHub API round trip that connecting doesn't need for a disconnect. */
-export async function findConnectedRepoGithubId(
+ * provider API round trip that connecting doesn't need for a disconnect. */
+export async function findConnectedRepoExternalId(
   userId: string,
   owner: string,
   name: string,
-): Promise<number | null> {
+): Promise<string | null> {
   const [repo] = await db
-    .select({ githubId: repos.githubId })
+    .select({ externalId: repos.externalId })
     .from(repos)
     .where(
       and(
@@ -143,7 +157,7 @@ export async function findConnectedRepoGithubId(
     )
     .limit(1);
 
-  return repo?.githubId ?? null;
+  return repo?.externalId ?? null;
 }
 
 export type RepoStatus =

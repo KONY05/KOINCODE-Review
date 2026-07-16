@@ -1,12 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-export type PRFile = {
-  filename: string;
-  status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
-  additions: number;
-  deletions: number;
-  patch?: string;
-};
+import type { PRFile } from "../types";
 
 const SKIP_PATTERNS = [
   /package-lock\.json$/,

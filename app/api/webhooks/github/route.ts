@@ -119,7 +119,8 @@ async function handlePullRequestClosed(payload: PullRequestPayload) {
     .from(repos)
     .where(
       and(
-        eq(repos.githubId, payload.repository.id),
+        eq(repos.provider, "github"),
+        eq(repos.externalId, String(payload.repository.id)),
         eq(repos.isActive, true)
       )
     )
@@ -197,7 +198,8 @@ async function handlePullRequest(payload: PullRequestPayload) {
     .from(repos)
     .where(
       and(
-        eq(repos.githubId, payload.repository.id),
+        eq(repos.provider, "github"),
+        eq(repos.externalId, String(payload.repository.id)),
         eq(repos.isActive, true)
       )
     )
@@ -279,7 +281,8 @@ async function handleReviewComment(payload: ReviewCommentPayload) {
     .from(repos)
     .where(
       and(
-        eq(repos.githubId, payload.repository.id),
+        eq(repos.provider, "github"),
+        eq(repos.externalId, String(payload.repository.id)),
         eq(repos.isActive, true)
       )
     )

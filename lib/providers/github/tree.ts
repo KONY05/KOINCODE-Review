@@ -1,5 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
+import type { RepoFile } from "../types";
+
 const CONFIG_FILES = new Set([
   "package.json",
   "tsconfig.json",
@@ -37,12 +39,6 @@ const CONFIG_FILES = new Set([
 ]);
 
 const README_PATTERNS = ["readme.md", "readme", "readme.rst", "readme.txt"];
-
-export type RepoFile = {
-  path: string;
-  content: string;
-  fileType: "readme" | "config" | "source" | "tree";
-};
 
 type TreeItem = {
   path?: string;

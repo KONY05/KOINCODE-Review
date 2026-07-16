@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireCliToken } from "@/lib/cli-auth";
 import { repoRefSchema } from "@/lib/cli/schemas";
-import { getGithubTokenForClerkUser } from "@/lib/github";
-import { fetchRepoByFullName } from "@/lib/github/repos";
+import { githubProvider } from "@/lib/providers/github";
 import { connectRepoForUser } from "@/lib/repos";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
@@ -23,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
   const { owner, repo: repoName } = parsed.data;
 
-  const token = await getGithubTokenForClerkUser(auth.clerkId);
+  const token = await githubProvider.getTokenForClerkUser(auth.clerkId);
   if (!token) {
     return NextResponse.json(
       { error: "GitHub token not found" },
@@ -31,7 +30,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const ghRepo = await fetchRepoByFullName(token, owner, repoName);
+  const ghRepo = await githubProvider.fetchRepoByFullName(token, owner, repoName);
   if (!ghRepo) {
     return NextResponse.json(
       { error: "Repository not found or not accessible" },
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await connectRepoForUser(auth.userId, ghRepo, token);
+  await connectRepoForUser(auth.userId, "github", ghRepo, token);
 
   await trackServer(EVENTS.REPO_CONNECTED, auth.userId, {
     repo_name: ghRepo.fullName,

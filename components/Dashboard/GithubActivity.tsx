@@ -5,7 +5,7 @@ import { ActivityCalendar } from "react-activity-calendar";
 import "react-activity-calendar/tooltips.css";
 import type { Activity } from "react-activity-calendar";
 import { Skeleton } from "../ui/skeleton";
-import type { ContributionCalendar } from "@/lib/github/contributions";
+import type { ContributionCalendar } from "@/lib/providers/github/contributions";
 
 const LEVEL_MAP: Record<string, number> = {
   NONE: 0,

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireCliToken } from "@/lib/cli-auth";
 import { repoRefSchema } from "@/lib/cli/schemas";
-import { getGithubTokenForClerkUser } from "@/lib/github";
-import { disconnectRepoForUser, findConnectedRepoGithubId } from "@/lib/repos";
+import { githubProvider } from "@/lib/providers/github";
+import { disconnectRepoForUser, findConnectedRepoExternalId } from "@/lib/repos";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
 
@@ -22,12 +22,12 @@ export async function POST(req: NextRequest) {
   }
   const { owner, repo: repoName } = parsed.data;
 
-  const githubId = await findConnectedRepoGithubId(
+  const externalId = await findConnectedRepoExternalId(
     auth.userId,
     owner,
     repoName,
   );
-  if (githubId === null) {
+  if (externalId === null) {
     return NextResponse.json(
       { error: "Repository is not connected" },
       { status: 404 },
@@ -35,10 +35,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Best-effort — a missing/expired GitHub token shouldn't block disconnecting locally.
-  const token = await getGithubTokenForClerkUser(auth.clerkId).catch(
-    () => null,
+  const token = await githubProvider
+    .getTokenForClerkUser(auth.clerkId)
+    .catch(() => null);
+  const repo = await disconnectRepoForUser(
+    auth.userId,
+    "github",
+    externalId,
+    token,
   );
-  const repo = await disconnectRepoForUser(auth.userId, githubId, token);
 
   await trackServer(EVENTS.REPO_DISCONNECTED, auth.userId, {
     repo_name: repo ? `${repo.owner}/${repo.name}` : undefined,

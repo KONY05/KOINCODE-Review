@@ -15,14 +15,15 @@ import {
   keyUsageLogs,
 } from "@/lib/db/schema";
 import { decrypt } from "@/lib/crypto";
-import { fetchRepoTree } from "@/lib/github/tree";
+import { fetchRepoTree } from "@/lib/providers/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
-import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/github/diff";
-import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
-import { postReviewComments, replyToComment } from "@/lib/github/comments";
-import { createCommitStatus } from "@/lib/github/checks";
-import { fetchPushChanges, detectAdoptions } from "@/lib/github/adoption";
+import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/providers/github/diff";
+import { fetchChangedFileContents, fetchFileContent } from "@/lib/providers/github/files";
+import { postReviewComments, replyToComment } from "@/lib/providers/github/comments";
+import { createCommitStatus } from "@/lib/providers/github/checks";
+import { fetchPushChanges } from "@/lib/providers/github/adoption";
+import { detectAdoptions } from "@/lib/providers/adoption";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
@@ -548,7 +549,13 @@ export const processReview = inngest.createFunction(
               body: c.body,
               suggestion: c.suggestion,
               status: "pending" as const,
-              githubCommentId: posted?.githubCommentId,
+              // DB storage keeps the GitHub-flavored field name/type for now
+              // (Feature 17 is a zero-behavior-change refactor); the
+              // provider layer speaks a generic string id, converted here at
+              // the single point where it's written into `reviews.comments`.
+              githubCommentId: posted?.providerCommentId
+                ? Number(posted.providerCommentId)
+                : undefined,
             };
           });
 

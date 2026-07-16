@@ -1,12 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-type CommitState = "pending" | "success" | "failure" | "error";
-
-type CommitStatusParams = {
-  state: CommitState;
-  description: string;
-  targetUrl?: string;
-};
+import type { CommitStatusParams } from "../types";
 
 const STATUS_CONTEXT = "KOINCODE Review";
 

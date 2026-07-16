@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 
 import { MONTH_LABELS } from "@/lib/constants";
-import type { ContributionStats } from "@/lib/github/contributions";
+import type { ContributionStats } from "@/lib/providers/github/contributions";
 
 function getYearRange() {
   const now = new Date();

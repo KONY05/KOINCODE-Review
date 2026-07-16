@@ -68,6 +68,7 @@ KOINCODE-Review is an AI-powered code review agent — a self-hosted alternative
 
 ### In Scope
 - GitHub integration (repos, PRs, webhooks, commits)
+- GitLab and Azure DevOps integration (repos, PRs, webhooks, commits) — see `context/feature-spec/16-extra-provider-support.md` for the provider-abstraction initiative and its sub-features (17–20)
 - Multi-provider LLM support (BYOK — bring your own key)
 - Vector-based codebase context retrieval
 - Inline PR review comments with fix suggestions
@@ -76,7 +77,7 @@ KOINCODE-Review is an AI-powered code review agent — a self-hosted alternative
 - Background job processing for reviews and indexing
 
 ### Out of Scope
-- GitLab / Bitbucket support (GitHub only for v1)
+- Bitbucket support
 - Built-in LLM hosting — users must provide their own API keys
 - Billing / subscription management
 - Team or organization-level accounts

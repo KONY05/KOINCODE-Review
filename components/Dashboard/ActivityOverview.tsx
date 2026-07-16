@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Skeleton } from "../ui/skeleton";
 
 import { MONTH_LABELS } from "@/lib/constants";
-import type { MonthlyActivity } from "@/lib/github/contributions";
+import type { MonthlyActivity } from "@/lib/providers/github/contributions";
 import type { MonthlyReviewCount } from "@/lib/actions/reviews";
 
 function formatMonth(yearMonth: string) {

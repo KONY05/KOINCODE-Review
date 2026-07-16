@@ -1,23 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-type ReviewComment = {
-  path: string;
-  startLine?: number;
-  line: number;
-  body: string;
-  suggestion?: string;
-};
-
-type PostedComment = {
-  path: string;
-  githubCommentId: number;
-};
-
-type ReviewSummary = {
-  summary: string;
-  walkthrough: { path: string; change: string }[];
-  diagram?: string;
-};
+import type { DraftReviewComment, PostedComment, ReviewSummary } from "../types";
 
 /**
  * Builds the top-level review body with a summary, file-by-file walkthrough,
@@ -64,7 +47,7 @@ function buildReviewBody(
  * Appends a GitHub suggestion code block to the comment body if a suggestion exists.
  * GitHub renders these as one-click "Apply suggestion" buttons in the PR UI.
  */
-function formatCommentBody(comment: ReviewComment): string {
+function formatCommentBody(comment: DraftReviewComment): string {
   let body = comment.body;
 
   if (comment.suggestion != null) {
@@ -202,9 +185,9 @@ function isNoOpSuggestion(
  *
  * Uses `createReview` with event `COMMENT` so the PR author receives one
  * notification instead of N. After posting, fetches the review's comments
- * back to capture each `githubCommentId` for the apply-fix / resolve flows.
+ * back to capture each posted comment's id for the apply-fix / resolve flows.
  *
- * @returns The posted comments with their GitHub IDs, in the same order as
+ * @returns The posted comments with their GitHub ids, in the same order as
  *   the input (minus any that were dropped due to unmappable positions).
  */
 export async function postReviewComments(
@@ -213,7 +196,7 @@ export async function postReviewComments(
   repo: string,
   prNumber: number,
   headSha: string,
-  comments: ReviewComment[],
+  comments: DraftReviewComment[],
   patches: Map<string, string>,
   reviewSummary: ReviewSummary
 ): Promise<PostedComment[]> {
@@ -292,7 +275,7 @@ export async function postReviewComments(
     for (const rc of reviewCommentsData) {
       postedComments.push({
         path: rc.path,
-        githubCommentId: rc.id,
+        providerCommentId: String(rc.id),
       });
     }
   }
@@ -305,7 +288,7 @@ export async function replyToComment(
   owner: string,
   repo: string,
   prNumber: number,
-  inReplyTo: number,
+  inReplyTo: string,
   body: string
 ): Promise<void> {
   const octokit = new Octokit({ auth: token });
@@ -314,7 +297,7 @@ export async function replyToComment(
     owner,
     repo,
     pull_number: prNumber,
-    comment_id: inReplyTo,
+    comment_id: Number(inReplyTo),
     body,
   });
 }

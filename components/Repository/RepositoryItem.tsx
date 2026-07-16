@@ -27,7 +27,7 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
     setConnected(!connected);
 
     const result = connected
-      ? await disconnectRepo(repo.githubId)
+      ? await disconnectRepo(repo.externalId)
       : await connectRepo(repo);
 
     if (result.success) {

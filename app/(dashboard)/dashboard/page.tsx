@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import Stats from "@/components/Dashboard/Stats";
 import GithubActivity from "@/components/Dashboard/GithubActivity";
 import ActivityOverview from "@/components/Dashboard/ActivityOverview";
-import { getGithubToken } from "@/lib/github";
-import { getContributions } from "@/lib/github/contributions";
+import { getGithubToken, getContributions } from "@/lib/providers/github";
 import {
   fetchReviewsSummary,
   fetchMonthlyReviewCounts,

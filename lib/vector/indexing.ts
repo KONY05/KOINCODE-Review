@@ -1,6 +1,6 @@
 import { getIndex, deleteByFilePath } from "./client";
 import { generateEmbeddings, chunkText } from "./embeddings";
-import { type RepoFile } from "@/lib/github/tree";
+import { type RepoFile } from "@/lib/providers/types";
 
 const BATCH_SIZE = 20;
 

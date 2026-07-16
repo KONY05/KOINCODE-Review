@@ -1,25 +1,13 @@
 import { Octokit } from "@octokit/rest";
 
-export interface GitHubRepo {
-  githubId: number;
-  name: string;
-  fullName: string;
-  owner: string;
-  description: string | null;
-  language: string | null;
-  stargazersCount: number;
-  isPrivate: boolean;
-  defaultBranch: string;
-  updatedAt: string;
-  htmlUrl: string;
-}
+import type { RemoteRepo } from "../types";
 
 type FetchReposResult = {
-  repos: GitHubRepo[];
+  repos: RemoteRepo[];
   hasNextPage: boolean;
 };
 
-export async function fetchUserRepos(
+export async function listUserRepos(
   token: string,
   page: number = 1,
   perPage: number = 20
@@ -33,8 +21,8 @@ export async function fetchUserRepos(
     page,
   });
 
-  const repos: GitHubRepo[] = response.data.map((repo) => ({
-    githubId: repo.id,
+  const repos: RemoteRepo[] = response.data.map((repo) => ({
+    externalId: String(repo.id),
     name: repo.name,
     fullName: repo.full_name,
     owner: repo.owner.login,
@@ -59,7 +47,7 @@ export async function fetchRepoByFullName(
   token: string,
   owner: string,
   repo: string
-): Promise<GitHubRepo | null> {
+): Promise<RemoteRepo | null> {
   const octokit = new Octokit({ auth: token });
 
   try {
@@ -67,7 +55,7 @@ export async function fetchRepoByFullName(
     const data = response.data;
 
     return {
-      githubId: data.id,
+      externalId: String(data.id),
       name: data.name,
       fullName: data.full_name,
       owner: data.owner.login,

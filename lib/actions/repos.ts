@@ -5,14 +5,14 @@ import { and, eq, ilike } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
-import { getGithubToken } from "@/lib/github";
-import { fetchUserRepos, type GitHubRepo } from "@/lib/github/repos";
+import { getGithubToken, githubProvider } from "@/lib/providers/github";
+import type { RemoteRepo } from "@/lib/providers/types";
 import { connectRepoForUser, disconnectRepoForUser } from "@/lib/repos";
 import { ok, fail, type ActionResult } from "@/lib/actions/types";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
 
-export type RepoWithStatus = GitHubRepo & {
+export type RepoWithStatus = RemoteRepo & {
   isConnected: boolean;
 };
 
@@ -32,22 +32,28 @@ export async function listGithubRepos(
     const token = await getGithubToken();
     if (!token) return fail("GitHub token not found");
 
-    const { repos: githubRepos, hasNextPage } = await fetchUserRepos(
+    const { repos: githubRepos, hasNextPage } = await githubProvider.listUserRepos(
       token,
       page,
       perPage,
     );
 
     const connectedRepos = await db
-      .select({ githubId: repos.githubId })
+      .select({ externalId: repos.externalId })
       .from(repos)
-      .where(and(eq(repos.userId, user.id), eq(repos.isActive, true)));
+      .where(
+        and(
+          eq(repos.userId, user.id),
+          eq(repos.provider, "github"),
+          eq(repos.isActive, true),
+        ),
+      );
 
-    const connectedIds = new Set(connectedRepos.map((r) => r.githubId));
+    const connectedIds = new Set(connectedRepos.map((r) => r.externalId));
 
     const reposWithStatus: RepoWithStatus[] = githubRepos.map((repo) => ({
       ...repo,
-      isConnected: connectedIds.has(repo.githubId),
+      isConnected: connectedIds.has(repo.externalId),
     }));
 
     return ok({ repos: reposWithStatus, hasNextPage });
@@ -83,7 +89,7 @@ export async function listConnectedRepos(
       : connectedRepos;
 
     const reposWithStatus: RepoWithStatus[] = sliced.map((r) => ({
-      githubId: r.githubId,
+      externalId: r.externalId,
       name: r.name,
       fullName: r.fullName,
       owner: r.owner,
@@ -103,7 +109,7 @@ export async function listConnectedRepos(
   }
 }
 
-export async function connectRepo(repo: GitHubRepo): Promise<ActionResult> {
+export async function connectRepo(repo: RemoteRepo): Promise<ActionResult> {
   try {
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
@@ -111,7 +117,7 @@ export async function connectRepo(repo: GitHubRepo): Promise<ActionResult> {
     const token = await getGithubToken();
     if (!token) return fail("GitHub token not found");
 
-    await connectRepoForUser(user.id, repo, token);
+    await connectRepoForUser(user.id, "github", repo, token);
 
     await trackServer(EVENTS.REPO_CONNECTED, user.id, {
       repo_name: repo.fullName,
@@ -125,13 +131,13 @@ export async function connectRepo(repo: GitHubRepo): Promise<ActionResult> {
   }
 }
 
-export async function disconnectRepo(githubId: number): Promise<ActionResult> {
+export async function disconnectRepo(externalId: string): Promise<ActionResult> {
   try {
     const user = await getAuthUser();
     if (!user) return fail("Unauthorized");
 
     const token = await getGithubToken();
-    const repo = await disconnectRepoForUser(user.id, githubId, token);
+    const repo = await disconnectRepoForUser(user.id, "github", externalId, token);
 
     await trackServer(EVENTS.REPO_DISCONNECTED, user.id, {
       repo_name: repo ? `${repo.owner}/${repo.name}` : undefined,

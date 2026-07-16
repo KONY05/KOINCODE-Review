@@ -22,11 +22,11 @@ export async function createRepoWebhook(
   token: string,
   owner: string,
   repo: string
-): Promise<number> {
+): Promise<string> {
   const octokit = new Octokit({ auth: token });
 
   const existingId = await findExistingWebhook(octokit, owner, repo);
-  if (existingId) return existingId;
+  if (existingId) return String(existingId);
 
   const response = await octokit.repos.createWebhook({
     owner,
@@ -40,20 +40,20 @@ export async function createRepoWebhook(
     active: true,
   });
 
-  return response.data.id;
+  return String(response.data.id);
 }
 
 export async function deleteRepoWebhook(
   token: string,
   owner: string,
   repo: string,
-  webhookId: number
+  webhookId: string
 ): Promise<void> {
   const octokit = new Octokit({ auth: token });
 
   await octokit.repos.deleteWebhook({
     owner,
     repo,
-    hook_id: webhookId,
+    hook_id: Number(webhookId),
   });
 }

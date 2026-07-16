@@ -152,7 +152,7 @@ export default function RepoList({
               <RepositoryItemSkeleton key={i} />
             ))
           : displayedRepos.map((repo) => (
-              <RepositoryItem key={repo.githubId} repo={repo} />
+              <RepositoryItem key={repo.externalId} repo={repo} />
             ))}
 
         {loading &&
