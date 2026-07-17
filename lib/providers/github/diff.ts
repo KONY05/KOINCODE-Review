@@ -1,18 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
 import type { PRFile } from "../types";
-
-const SKIP_PATTERNS = [
-  /package-lock\.json$/,
-  /pnpm-lock\.yaml$/,
-  /yarn\.lock$/,
-  /\.min\.(js|css)$/,
-  /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot)$/,
-];
-
-function shouldSkipFile(filename: string): boolean {
-  return SKIP_PATTERNS.some((pattern) => pattern.test(filename));
-}
+import { shouldSkipFile } from "../diff-utils";
 
 export async function fetchPRFiles(
   token: string,

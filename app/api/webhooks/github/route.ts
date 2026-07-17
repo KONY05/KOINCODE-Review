@@ -1,14 +1,14 @@
 import crypto from "node:crypto";
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, inArray } from "drizzle-orm";
 
 import { env } from "@/config/env";
 import { db } from "@/lib/db";
-import { repos, reviews } from "@/lib/db/schema";
+import { reviews } from "@/lib/db/schema";
 import { inngest } from "@/lib/inngest/client";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
+import { findActiveRepo, cancelInFlightReviews, findParentReviewComment } from "@/lib/webhooks/repo-lookup";
 
 type PullRequestAction =
   | "opened"
@@ -81,50 +81,8 @@ function verifySignature(payload: string, signature: string | null): boolean {
   );
 }
 
-async function cancelInFlightReviews(
-  repoId: string,
-  prNumber: number,
-  summary: string
-) {
-  const inFlight = await db
-    .select({ id: reviews.id })
-    .from(reviews)
-    .where(
-      and(
-        eq(reviews.repoId, repoId),
-        eq(reviews.prNumber, prNumber),
-        inArray(reviews.status, ["pending", "in_progress"])
-      )
-    );
-
-  if (inFlight.length === 0) return [];
-
-  await db
-    .update(reviews)
-    .set({ status: "failed", summary })
-    .where(
-      and(
-        eq(reviews.repoId, repoId),
-        eq(reviews.prNumber, prNumber),
-        inArray(reviews.status, ["pending", "in_progress"])
-      )
-    );
-
-  return inFlight;
-}
-
 async function handlePullRequestClosed(payload: PullRequestPayload) {
-  const [repo] = await db
-    .select({ id: repos.id, userId: repos.userId })
-    .from(repos)
-    .where(
-      and(
-        eq(repos.provider, "github"),
-        eq(repos.externalId, String(payload.repository.id)),
-        eq(repos.isActive, true)
-      )
-    )
-    .limit(1);
+  const repo = await findActiveRepo("github", String(payload.repository.id));
 
   if (!repo) {
     return NextResponse.json({ ignored: true });
@@ -160,6 +118,7 @@ async function handlePullRequestClosed(payload: PullRequestPayload) {
     name: "pr/review-cancelled" as const,
     data: {
       reviewId: r.id,
+      repoId: repo.id,
       repoFullName: payload.repository.full_name,
       headSha: payload.pull_request.head.sha,
       userId: repo.userId,
@@ -193,17 +152,7 @@ async function handlePullRequest(payload: PullRequestPayload) {
     return NextResponse.json({ ignored: true });
   }
 
-  const [repo] = await db
-    .select({ id: repos.id, userId: repos.userId })
-    .from(repos)
-    .where(
-      and(
-        eq(repos.provider, "github"),
-        eq(repos.externalId, String(payload.repository.id)),
-        eq(repos.isActive, true)
-      )
-    )
-    .limit(1);
+  const repo = await findActiveRepo("github", String(payload.repository.id));
 
   if (!repo) {
     return NextResponse.json({ ignored: true });
@@ -276,37 +225,16 @@ async function handleReviewComment(payload: ReviewCommentPayload) {
     return NextResponse.json({ ignored: true });
   }
 
-  const [repo] = await db
-    .select({ id: repos.id, userId: repos.userId })
-    .from(repos)
-    .where(
-      and(
-        eq(repos.provider, "github"),
-        eq(repos.externalId, String(payload.repository.id)),
-        eq(repos.isActive, true)
-      )
-    )
-    .limit(1);
+  const repo = await findActiveRepo("github", String(payload.repository.id));
 
   if (!repo) {
     return NextResponse.json({ ignored: true });
   }
 
-  const parentCommentId = payload.comment.in_reply_to_id;
-
-  const completedReviews = await db
-    .select({ id: reviews.id, comments: reviews.comments })
-    .from(reviews)
-    .where(
-      and(
-        eq(reviews.repoId, repo.id),
-        eq(reviews.status, "completed")
-      )
-    );
-
-  const parentComment = completedReviews
-    .flatMap((r) => (r.comments ?? []).map((c) => ({ reviewId: r.id, ...c })))
-    .find((c) => c.githubCommentId === parentCommentId);
+  const parentComment = await findParentReviewComment(
+    repo.id,
+    String(payload.comment.in_reply_to_id),
+  );
 
   if (!parentComment) {
     return NextResponse.json({ ignored: true });

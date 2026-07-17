@@ -51,6 +51,9 @@ INNGEST_SIGNING_KEY=                  # Inngest signing key
 # GitHub
 GITHUB_WEBHOOK_SECRET=                # GitHub webhook signing secret
 
+# GitLab (optional — only needed once GitLab is enabled as a Clerk social connection)
+GITLAB_WEBHOOK_SECRET=                # GitLab webhook secret token (sent via X-Gitlab-Token header)
+
 # Encryption
 ENCRYPTION_KEY=                       # AES-256-GCM key for encrypting user API keys at rest (openssl rand -hex 32)
 

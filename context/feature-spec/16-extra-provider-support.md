@@ -42,7 +42,7 @@ This was already implicitly assumed by the Feature 17 schema (`repos.provider` i
 | # | Feature | Status |
 |---|---|---|
 | 17 | Provider abstraction refactor — define `GitProvider`, move existing GitHub code to implement it, zero behavior change | Done — see `context/feature-spec/17-git-provider-abstraction.md` |
-| 18 | GitLab integration — Clerk social connection, webhook handling, PR/diff/comment API implementation | Not started |
+| 18 | GitLab integration — Clerk social connection, webhook handling, PR/diff/comment API implementation | Done (backend + account-linking only — the "connect a GitLab repo" UI is still Feature 20) — see `context/feature-spec/18-gitlab-integration.md` |
 | 19 | Azure DevOps integration — auth research spike (Entra ID custom OAuth connection, `vso` scopes) up front, then webhook/PR/comment API implementation | Not started |
 | 20 | Landing page, onboarding & dashboard/repo UI for multi-provider (see below) | Not started |
 

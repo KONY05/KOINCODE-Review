@@ -5,6 +5,7 @@ import {
   boolean,
   uuid,
   unique,
+  index,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
@@ -16,9 +17,8 @@ export const indexingStatusEnum = pgEnum("indexing_status", [
   "failed",
 ]);
 
-// Only "github" exists today — add "gitlab" / "azure_devops" as those
-// providers actually land (Features 18/19), not speculatively here.
-export const gitProviderEnum = pgEnum("git_provider", ["github"]);
+// "azure_devops" gets added when Feature 19 lands, not speculatively here.
+export const gitProviderEnum = pgEnum("git_provider", ["github", "gitlab"]);
 
 export const repos = pgTable(
   "repos",
@@ -48,5 +48,11 @@ export const repos = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.provider, t.externalId)]
+  (t) => [
+    unique().on(t.userId, t.provider, t.externalId),
+    // Every webhook delivery looks a repo up by (provider, externalId) alone
+    // (no userId in scope yet) — the unique constraint above can't serve
+    // that query efficiently since userId is its leading column.
+    index("repos_provider_external_id_idx").on(t.provider, t.externalId),
+  ]
 );

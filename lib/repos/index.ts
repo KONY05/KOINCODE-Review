@@ -77,7 +77,7 @@ export async function connectRepoForUser(
         owner: repo.owner,
         name: repo.name,
         defaultBranch: repo.defaultBranch,
-        githubToken: token,
+        token,
       },
     });
   }

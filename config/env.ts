@@ -8,6 +8,11 @@ const envSchema = z.object({
 
   CLERK_WEBHOOK_SECRET: z.string(),
   GITHUB_WEBHOOK_SECRET: z.string(),
+  // Optional: GitLab isn't configured as a Clerk social connection in every
+  // environment yet (Feature 18 needs a GitLab OAuth app + Clerk dashboard
+  // setup done manually first). The webhook route 401s if this is unset
+  // rather than the whole app failing to boot without it.
+  GITLAB_WEBHOOK_SECRET: z.string().optional(),
 
   APP_URL: z.string(),
 

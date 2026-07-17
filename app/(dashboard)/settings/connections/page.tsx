@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import ConnectionsSection from "@/components/Settings/connections/ConnectionsSection";
+import GitProviderConnections from "@/components/Settings/connections/GitProviderConnections";
 import { getCliConnections } from "@/lib/actions/cli-connections";
 
 export const metadata: Metadata = { title: "Connections" };
@@ -18,6 +19,7 @@ export default async function ConnectionsSettingsPage() {
         Everywhere KOINCODE Review is connected to your workflow
       </p>
 
+      <GitProviderConnections />
       <ConnectionsSection connections={connections} />
     </div>
   );

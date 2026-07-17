@@ -71,6 +71,20 @@
       "when": 1784192523293,
       "tag": "0009_provider-abstraction-step2",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784196260052,
+      "tag": "0010_add-gitlab-provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784215335027,
+      "tag": "0011_add-repos-provider-external-id-index",
+      "breakpoints": true
     }
   ]
 }

@@ -1,15 +1,14 @@
 import { Octokit } from "@octokit/rest";
 
 import type { CommitStatusParams } from "../types";
-
-const STATUS_CONTEXT = "KOINCODE Review";
+import { STATUS_NAME } from "../constants";
 
 export async function createCommitStatus(
   token: string,
   owner: string,
   repo: string,
   sha: string,
-  params: CommitStatusParams
+  params: CommitStatusParams,
 ): Promise<void> {
   const octokit = new Octokit({ auth: token });
 
@@ -20,6 +19,6 @@ export async function createCommitStatus(
     state: params.state,
     description: params.description.slice(0, 140),
     target_url: params.targetUrl,
-    context: STATUS_CONTEXT,
+    context: STATUS_NAME,
   });
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthenticateWithRedirectCallback } from "@clerk/nextjs";
 
 import Logo from "@/components/Logo";
@@ -12,7 +13,9 @@ export default function SSOCallbackPage() {
           Completing sign in…
         </p>
       </div>
-      <SignInTracker />
+      <Suspense fallback={null}>
+        <SignInTracker />
+      </Suspense>
       <AuthenticateWithRedirectCallback />
     </div>
   );

@@ -1,0 +1,1 @@
+CREATE INDEX "repos_provider_external_id_idx" ON "repos" USING btree ("provider","external_id");

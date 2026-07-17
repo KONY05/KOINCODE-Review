@@ -30,7 +30,10 @@ export type ReviewComment = {
     newCode: string;
   };
   status: "pending" | "adopted";
-  githubCommentId?: number;
+  // Generic across providers: GitHub's numeric comment id (stringified) or
+  // GitLab's discussion id (already a string hash) — whichever id the
+  // provider needs to reply into the same thread later.
+  providerCommentId?: string;
 }
 
 export const reviews = pgTable("reviews", {

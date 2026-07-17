@@ -1,7 +1,7 @@
-// Only "github" is implemented today — "gitlab" / "azure_devops" get added to
-// this union in Features 18/19 alongside their GitProvider implementations,
-// not speculatively here. Mirrors the git_provider Postgres enum.
-export type GitProviderId = "github";
+// "azure_devops" gets added to this union in Feature 19 alongside its
+// GitProvider implementation, not speculatively here. Mirrors the
+// git_provider Postgres enum.
+export type GitProviderId = "github" | "gitlab";
 
 export type RemoteRepo = {
   externalId: string;

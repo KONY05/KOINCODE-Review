@@ -1,33 +1,35 @@
-import { Octokit } from "@octokit/rest";
-
 import type { RepoFile } from "../types";
 import { classifyFile } from "../tree-classify";
+import { gitlabFetchPaginated, projectPath } from "./client";
+import { fetchFileContent } from "./files";
 
-type TreeItem = {
-  path?: string;
-  type?: string;
-  size?: number;
+type GitlabTreeItem = {
+  path: string;
+  type: "tree" | "blob";
 };
+
+const MAX_TREE_PAGES = 20;
 
 export async function fetchRepoTree(
   token: string,
   owner: string,
   repo: string,
-  defaultBranch: string
+  defaultBranch: string,
 ): Promise<RepoFile[]> {
-  const octokit = new Octokit({ auth: token });
+  const id = projectPath(owner, repo);
   const MAX_FILES = 30;
 
-  const { data: treeData } = await octokit.git.getTree({
-    owner,
-    repo,
-    tree_sha: defaultBranch,
-    recursive: "true",
-  });
+  const items: GitlabTreeItem[] = [];
+  for (let page = 1; page <= MAX_TREE_PAGES; page++) {
+    const { items: batch, hasNextPage } = await gitlabFetchPaginated<GitlabTreeItem[]>(
+      token,
+      `/projects/${id}/repository/tree?recursive=true&ref=${encodeURIComponent(defaultBranch)}&per_page=100&page=${page}`,
+    );
+    items.push(...batch);
+    if (!hasNextPage) break;
+  }
 
-  const treeItems: TreeItem[] = treeData.tree;
-  const treeListing = treeItems
-    .filter((item) => item.path)
+  const treeListing = items
     .map((item) => `${item.type === "tree" ? "d" : "f"} ${item.path}`)
     .join("\n");
 
@@ -36,9 +38,8 @@ export async function fetchRepoTree(
   ];
 
   const filesToFetch: { path: string; fileType: RepoFile["fileType"] }[] = [];
-  for (const item of treeItems) {
-    if (!item.path || item.type !== "blob") continue;
-    if ((item.size ?? 0) > 100_000) continue;
+  for (const item of items) {
+    if (item.type !== "blob") continue;
 
     const fileType = classifyFile(item.path);
     if (fileType) {
@@ -49,20 +50,9 @@ export async function fetchRepoTree(
 
   const contentResults = await Promise.allSettled(
     filesToFetch.map(async ({ path, fileType }) => {
-      const { data } = await octokit.repos.getContent({
-        owner,
-        repo,
-        path,
-        ref: defaultBranch,
-      });
-
-      if ("content" in data && data.encoding === "base64") {
-        const content = Buffer.from(data.content, "base64").toString("utf-8");
-        return { path, content, fileType } satisfies RepoFile;
-      }
-
-      return null;
-    })
+      const content = await fetchFileContent(token, owner, repo, path, defaultBranch);
+      return content ? ({ path, content, fileType } satisfies RepoFile) : null;
+    }),
   );
 
   for (const result of contentResults) {

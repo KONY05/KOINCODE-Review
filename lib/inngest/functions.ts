@@ -1,5 +1,4 @@
 import { eq, and, lt, asc, count } from "drizzle-orm";
-import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { inngest } from "./client";
@@ -15,15 +14,11 @@ import {
   keyUsageLogs,
 } from "@/lib/db/schema";
 import { decrypt } from "@/lib/crypto";
-import { fetchRepoTree } from "@/lib/providers/github/tree";
+import { getProvider } from "@/lib/providers/registry";
+import type { GitProviderId } from "@/lib/providers/types";
+import { detectAdoptions } from "@/lib/providers/adoption";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
-import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/providers/github/diff";
-import { fetchChangedFileContents, fetchFileContent } from "@/lib/providers/github/files";
-import { postReviewComments, replyToComment } from "@/lib/providers/github/comments";
-import { createCommitStatus } from "@/lib/providers/github/checks";
-import { fetchPushChanges } from "@/lib/providers/github/adoption";
-import { detectAdoptions } from "@/lib/providers/adoption";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
@@ -31,8 +26,6 @@ import type { ReviewComment } from "@/lib/db/schema/reviews";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 import type { UsageAction, UsageStatus } from "@/lib/db/schema/key-usage-logs";
 import { EMBEDDING_MODEL } from "../vector/embeddings";
-
-
 
 async function logKeyUsage(values: {
   userId: string;
@@ -55,6 +48,17 @@ async function logKeyUsage(values: {
   }
 }
 
+/** Every event handler needs to know which GitProvider implementation to dispatch through — looked up fresh by repoId rather than trusting a value captured at webhook time. */
+async function getRepoGitProvider(repoId: string): Promise<GitProviderId | null> {
+  const [repo] = await db
+    .select({ provider: repos.provider })
+    .from(repos)
+    .where(eq(repos.id, repoId))
+    .limit(1);
+
+  return repo?.provider ?? null;
+}
+
 export const indexRepo = inngest.createFunction(
   {
     id: "index-repo",
@@ -62,13 +66,15 @@ export const indexRepo = inngest.createFunction(
     triggers: [{ event: "repo/connected" }],
   },
   async ({ event }) => {
-    const { repoId, owner, name, defaultBranch, githubToken } = event.data;
+    const { repoId, owner, name, defaultBranch, token } = event.data;
 
     const [repo] = await db
-      .select({ userId: repos.userId })
+      .select({ userId: repos.userId, provider: repos.provider })
       .from(repos)
       .where(eq(repos.id, repoId))
       .limit(1);
+
+    const gitProvider = repo?.provider ?? "github";
 
     let googleApiKey: string | undefined;
     let googleKeyId: string | undefined;
@@ -93,8 +99,8 @@ export const indexRepo = inngest.createFunction(
       .where(eq(repos.id, repoId));
 
     try {
-      const files = await fetchRepoTree(
-        githubToken,
+      const files = await getProvider(gitProvider).fetchRepoTree(
+        token,
         owner,
         name,
         defaultBranch
@@ -204,8 +210,11 @@ export const cancelReview = inngest.createFunction(
     triggers: [{ event: "pr/review-cancelled" }],
   },
   async ({ event }) => {
-    const { repoFullName, headSha, userId } = event.data;
+    const { repoId, repoFullName, headSha, userId } = event.data;
     const [owner, repoName] = repoFullName.split("/");
+
+    const gitProvider = await getRepoGitProvider(repoId);
+    if (!gitProvider) return { status: "skipped", reason: "repo-not-found" };
 
     const [user] = await db
       .select({ clerkId: users.clerkId })
@@ -215,16 +224,10 @@ export const cancelReview = inngest.createFunction(
 
     if (!user) return { status: "skipped", reason: "user-not-found" };
 
-    const client = await clerkClient();
-    const response = await client.users.getUserOauthAccessToken(
-      user.clerkId,
-      "github"
-    );
-    
-    const token = response.data[0]?.token;
+    const token = await getProvider(gitProvider).getTokenForClerkUser(user.clerkId);
     if (!token) return { status: "skipped", reason: "no-token" };
 
-    await createCommitStatus(token, owner, repoName, headSha, {
+    await getProvider(gitProvider).createCommitStatus(token, owner, repoName, headSha, {
       state: "success",
       description: "Review cancelled — PR closed",
     });
@@ -276,23 +279,21 @@ export const processReview = inngest.createFunction(
       return { clerkId: user.clerkId };
     });
 
-    const githubToken = await step.run("get-github-token", async () => {
-      const client = await clerkClient();
+    const { gitProvider, providerToken } = await step.run(
+      "load-repo-provider-and-token",
+      async () => {
+        const provider = await getRepoGitProvider(repoId);
+        if (!provider) throw new Error("Repo not found");
 
-      const response = await client.users.getUserOauthAccessToken(
-        userConfig.clerkId,
-        "github"
-      );
+        const token = await getProvider(provider).getTokenForClerkUser(userConfig.clerkId);
+        if (!token) throw new Error(`Could not retrieve ${provider} token`);
 
-      const token = response.data[0]?.token;
-
-      if (!token) throw new Error("Could not retrieve GitHub token");
-
-      return token;
-    });
+        return { gitProvider: provider, providerToken: token };
+      },
+    );
 
     await step.run("set-commit-status-pending", async () => {
-      await createCommitStatus(githubToken, owner, repoName, headSha, {
+      await getProvider(gitProvider).createCommitStatus(providerToken, owner, repoName, headSha, {
         state: "pending",
         description: "Review in progress...",
       });
@@ -346,7 +347,7 @@ export const processReview = inngest.createFunction(
           })
           .where(eq(reviews.id, reviewId));
 
-        await createCommitStatus(githubToken, owner, repoName, headSha, {
+        await getProvider(gitProvider).createCommitStatus(providerToken, owner, repoName, headSha, {
           state: "failure",
           description: "No API key configured. Add one in Settings.",
         });
@@ -374,18 +375,20 @@ export const processReview = inngest.createFunction(
       const reviewData = await step.run("run-review", async () => {
         if (!(await isReviewStillActive(reviewId))) return null;
 
+        const provider = getProvider(gitProvider);
+
         const [prFiles, diff, reviewSha] = await Promise.all([
-          fetchPRFiles(githubToken, owner, repoName, prNumber),
-          fetchPRDiff(githubToken, owner, repoName, prNumber),
-          fetchPRHeadSha(githubToken, owner, repoName, prNumber),
+          provider.fetchPRFiles(providerToken, owner, repoName, prNumber),
+          provider.fetchPRDiff(providerToken, owner, repoName, prNumber),
+          provider.fetchPRHeadSha(providerToken, owner, repoName, prNumber),
         ]);
 
         const reviewableFiles = prFiles
           .filter((f) => f.status === "added" || f.status === "modified")
           .map((f) => f.filename);
 
-        const fileContents = await fetchChangedFileContents(
-          githubToken,
+        const fileContents = await provider.fetchChangedFileContents(
+          providerToken,
           owner,
           repoName,
           reviewableFiles,
@@ -518,8 +521,8 @@ export const processReview = inngest.createFunction(
         const patches = new Map(Object.entries(reviewData.patches));
 
         try {
-          return await postReviewComments(
-            githubToken,
+          return await getProvider(gitProvider).postReviewComments(
+            providerToken,
             owner,
             repoName,
             prNumber,
@@ -533,7 +536,7 @@ export const processReview = inngest.createFunction(
             }
           );
         } catch (error) {
-          console.error("Failed to post review comments to GitHub:", error);
+          console.error(`Failed to post review comments to ${gitProvider}:`, error);
           return [];
         }
       });
@@ -549,13 +552,7 @@ export const processReview = inngest.createFunction(
               body: c.body,
               suggestion: c.suggestion,
               status: "pending" as const,
-              // DB storage keeps the GitHub-flavored field name/type for now
-              // (Feature 17 is a zero-behavior-change refactor); the
-              // provider layer speaks a generic string id, converted here at
-              // the single point where it's written into `reviews.comments`.
-              githubCommentId: posted?.providerCommentId
-                ? Number(posted.providerCommentId)
-                : undefined,
+              providerCommentId: posted?.providerCommentId,
             };
           });
 
@@ -587,8 +584,8 @@ export const processReview = inngest.createFunction(
             ? `Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`
             : "No issues found";
 
-        await createCommitStatus(
-          githubToken,
+        await getProvider(gitProvider).createCommitStatus(
+          providerToken,
           owner,
           repoName,
           reviewData.reviewSha,
@@ -633,7 +630,7 @@ export const processReview = inngest.createFunction(
         const reason =
           error instanceof Error ? error.message : "Unknown error";
 
-        await createCommitStatus(githubToken, owner, repoName, headSha, {
+        await getProvider(gitProvider).createCommitStatus(providerToken, owner, repoName, headSha, {
           state: "error",
           description: `Review failed: ${reason}`,
         });
@@ -671,6 +668,9 @@ export const indexChangedFilesJob = inngest.createFunction(
 
     const [owner, repoName] = repoFullName.split("/");
 
+    const gitProvider = await getRepoGitProvider(repoId);
+    if (!gitProvider) return { status: "skipped", reason: "repo-not-found" };
+
     const [user] = await db
       .select({ clerkId: users.clerkId })
       .from(users)
@@ -679,13 +679,8 @@ export const indexChangedFilesJob = inngest.createFunction(
 
     if (!user) return { status: "skipped", reason: "user-not-found" };
 
-    const client = await clerkClient();
-    const response = await client.users.getUserOauthAccessToken(
-      user.clerkId,
-      "github"
-    );
-    const githubToken = response.data[0]?.token;
-    if (!githubToken) return { status: "skipped", reason: "no-token" };
+    const token = await getProvider(gitProvider).getTokenForClerkUser(user.clerkId);
+    if (!token) return { status: "skipped", reason: "no-token" };
 
     let googleApiKey: string | undefined;
     const [googleKey] = await db
@@ -703,8 +698,8 @@ export const indexChangedFilesJob = inngest.createFunction(
     let filesIndexed = 0;
 
     for (const filePath of filePaths) {
-      const content = await fetchFileContent(
-        githubToken,
+      const content = await getProvider(gitProvider).fetchFileContent(
+        token,
         owner,
         repoName,
         filePath,
@@ -783,7 +778,10 @@ export const trackAdoption = inngest.createFunction(
       return { status: "skipped", reason: "no-pending-comments" };
     }
 
-    const githubToken = await step.run("get-github-token", async () => {
+    const providerToken = await step.run("get-provider-token", async () => {
+      const gitProvider = await getRepoGitProvider(repoId);
+      if (!gitProvider) return null;
+
       const [user] = await db
         .select({ clerkId: users.clerkId })
         .from(users)
@@ -792,20 +790,15 @@ export const trackAdoption = inngest.createFunction(
 
       if (!user) return null;
 
-      const client = await clerkClient();
-      const response = await client.users.getUserOauthAccessToken(
-        user.clerkId,
-        "github"
-      );
-
-      return response.data[0]?.token ?? null;
+      const token = await getProvider(gitProvider).getTokenForClerkUser(user.clerkId);
+      return token ? { token, gitProvider } : null;
     });
 
-    if (!githubToken) return { status: "skipped", reason: "no-token" };
+    if (!providerToken) return { status: "skipped", reason: "no-token" };
 
     const pushChanges = await step.run("fetch-push-changes", async () => {
-      return fetchPushChanges(
-        githubToken,
+      return getProvider(providerToken.gitProvider).fetchPushChanges(
+        providerToken.token,
         owner,
         repoName,
         beforeSha,
@@ -943,6 +936,8 @@ export const processCommentReply = inngest.createFunction(
 
     const [owner, repoName] = repoFullName.split("/");
 
+    const gitProvider = await getRepoGitProvider(repoId);
+
     const config = await step.run("load-config", async () => {
       const [user] = await db
         .select({ clerkId: users.clerkId })
@@ -975,6 +970,7 @@ export const processCommentReply = inngest.createFunction(
     });
 
     if (!config) return { status: "skipped", reason: "no-config" };
+    if (!gitProvider) return { status: "skipped", reason: "repo-not-found" };
 
     const rule = await step.run("extract-rule", async () => {
       const apiKey = decrypt(config.encryptedKey);
@@ -1088,25 +1084,20 @@ export const processCommentReply = inngest.createFunction(
 
     await trackServer(EVENTS.MEMORY_RULE_ADDED, userId, {
       repo_id: repoId,
-      source: "github",
+      source: gitProvider,
     });
 
-    await step.run("confirm-on-github", async () => {
+    await step.run("confirm-reply", async () => {
       try {
-        const client = await clerkClient();
-        const response = await client.users.getUserOauthAccessToken(
-          config.clerkId,
-          "github"
-        );
-        const token = response.data[0]?.token;
+        const token = await getProvider(gitProvider).getTokenForClerkUser(config.clerkId);
         if (!token) return;
 
-        await replyToComment(
+        await getProvider(gitProvider).replyToComment(
           token,
           owner,
           repoName,
           prNumber,
-          replyCommentId,
+          String(replyCommentId),
           `Got it — I'll remember: *${rule}*`
         );
       } catch (error) {
