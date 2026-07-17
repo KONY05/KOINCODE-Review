@@ -312,18 +312,23 @@ export const processReview = inngest.createFunction(
       if (!key) return null;
 
       let googleEncryptedKey: string | undefined;
+      let googleKeyId: string | undefined;
       if (key.provider === "google") {
         googleEncryptedKey = key.encryptedKey;
+        googleKeyId = key.id;
       } else {
         const [googleKey] = await db
-          .select({ encryptedKey: apiKeys.encryptedKey })
+          .select({ id: apiKeys.id, encryptedKey: apiKeys.encryptedKey })
           .from(apiKeys)
           .where(
             and(eq(apiKeys.userId, userId), eq(apiKeys.provider, "google"))
           )
           .limit(1);
 
-        if (googleKey) googleEncryptedKey = googleKey.encryptedKey;
+        if (googleKey) {
+          googleEncryptedKey = googleKey.encryptedKey;
+          googleKeyId = googleKey.id;
+        }
       }
 
       return {
@@ -332,6 +337,7 @@ export const processReview = inngest.createFunction(
         model: key.model,
         encryptedKey: key.encryptedKey,
         googleEncryptedKey,
+        googleKeyId,
       };
     });
 
@@ -420,7 +426,7 @@ export const processReview = inngest.createFunction(
           if (googleApiKey && retrieval.usage.tokens > 0) {
             await logKeyUsage({
               userId,
-              apiKeyId: config.apiKeyId,
+              apiKeyId: config.googleKeyId,
               repoId,
               reviewId,
               action: "embedding",
@@ -601,7 +607,7 @@ export const processReview = inngest.createFunction(
           repoFullName,
           headSha: reviewData.reviewSha,
           filePaths: reviewData.reviewedFiles,
-          apiKeyId: config.apiKeyId,
+          apiKeyId: config.googleKeyId,
         },
       });
 

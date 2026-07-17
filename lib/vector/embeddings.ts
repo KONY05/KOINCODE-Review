@@ -36,6 +36,14 @@ export type EmbeddingResult = {
   durationMs: number;
 };
 
+// Google's embedContent/batchEmbedContents API never returns token usage,
+// so @ai-sdk/google's doEmbed() always resolves usage as undefined. Estimate
+// from character count (~4 chars/token) so usage logs aren't always zero.
+function estimateTokens(texts: string[]): number {
+  const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+  return Math.ceil(totalChars / 4);
+}
+
 export async function generateEmbeddings(
   texts: string[],
   apiKey?: string
@@ -58,7 +66,7 @@ export async function generateEmbeddings(
 
   return {
     embeddings,
-    usage: { tokens: usage?.tokens ?? 0 },
+    usage: { tokens: usage?.tokens || estimateTokens(texts) },
     durationMs,
   };
 }
