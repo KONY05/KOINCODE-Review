@@ -4,10 +4,25 @@ import { db } from "@/lib/db";
 import { repos, reviews } from "@/lib/db/schema";
 import type { GitProviderId } from "@/lib/providers/types";
 
-/** Shared by every provider's webhook route — the repo lookup itself never depends on payload shape. */
+/**
+ * Shared by every provider's webhook route — the repo lookup itself never
+ * depends on payload shape. webhookSecret is only ever non-null for Azure
+ * DevOps repos on the manual webhook-setup path (see
+ * app/api/webhooks/azure-devops/route.ts), but selecting it here for every
+ * provider is harmless — it stays null for GitHub/GitLab. fullName is
+ * likewise only actually needed by the Azure DevOps route (its webhook
+ * payload has no reliable way to reconstruct the "organization/project/repo"
+ * triple stored in repos.fullName, unlike GitHub's/GitLab's payloads which
+ * already carry their own full name directly).
+ */
 export async function findActiveRepo(provider: GitProviderId, externalId: string) {
   const [repo] = await db
-    .select({ id: repos.id, userId: repos.userId })
+    .select({
+      id: repos.id,
+      userId: repos.userId,
+      webhookSecret: repos.webhookSecret,
+      fullName: repos.fullName,
+    })
     .from(repos)
     .where(
       and(

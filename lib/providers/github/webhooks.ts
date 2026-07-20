@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
 import { env } from "@/config/env";
+import type { CreateWebhookResult } from "../types";
 
 function getWebhookUrl(): string {
   return `${env.APP_URL}/api/webhooks/github`;
@@ -22,11 +23,11 @@ export async function createRepoWebhook(
   token: string,
   owner: string,
   repo: string
-): Promise<string> {
+): Promise<CreateWebhookResult> {
   const octokit = new Octokit({ auth: token });
 
   const existingId = await findExistingWebhook(octokit, owner, repo);
-  if (existingId) return String(existingId);
+  if (existingId) return { status: "created", webhookId: String(existingId) };
 
   const response = await octokit.repos.createWebhook({
     owner,
@@ -40,7 +41,7 @@ export async function createRepoWebhook(
     active: true,
   });
 
-  return String(response.data.id);
+  return { status: "created", webhookId: String(response.data.id) };
 }
 
 export async function deleteRepoWebhook(

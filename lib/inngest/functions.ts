@@ -17,6 +17,7 @@ import { decrypt } from "@/lib/crypto";
 import { getProvider } from "@/lib/providers/registry";
 import type { GitProviderId } from "@/lib/providers/types";
 import { detectAdoptions } from "@/lib/providers/adoption";
+import { splitRepoFullName } from "@/lib/providers/helper";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
@@ -211,7 +212,7 @@ export const cancelReview = inngest.createFunction(
   },
   async ({ event }) => {
     const { repoId, repoFullName, headSha, userId } = event.data;
-    const [owner, repoName] = repoFullName.split("/");
+    const { owner, repo: repoName } = splitRepoFullName(repoFullName);
 
     const gitProvider = await getRepoGitProvider(repoId);
     if (!gitProvider) return { status: "skipped", reason: "repo-not-found" };
@@ -265,7 +266,7 @@ export const processReview = inngest.createFunction(
       repoFullName,
     } = event.data;
 
-    const [owner, repoName] = repoFullName.split("/");
+    const { owner, repo: repoName } = splitRepoFullName(repoFullName);
 
     const userConfig = await step.run("load-user", async () => {
       const [user] = await db
@@ -666,7 +667,7 @@ export const indexChangedFilesJob = inngest.createFunction(
       apiKeyId,
     } = event.data;
 
-    const [owner, repoName] = repoFullName.split("/");
+    const { owner, repo: repoName } = splitRepoFullName(repoFullName);
 
     const gitProvider = await getRepoGitProvider(repoId);
     if (!gitProvider) return { status: "skipped", reason: "repo-not-found" };
@@ -752,7 +753,7 @@ export const trackAdoption = inngest.createFunction(
       afterSha,
     } = event.data;
 
-    const [owner, repoName] = repoFullName.split("/");
+    const { owner, repo: repoName } = splitRepoFullName(repoFullName);
 
     const reviewsWithPendingComments = await step.run(
       "load-pending-reviews",
@@ -934,7 +935,7 @@ export const processCommentReply = inngest.createFunction(
       sourceUrl,
     } = event.data;
 
-    const [owner, repoName] = repoFullName.split("/");
+    const { owner, repo: repoName } = splitRepoFullName(repoFullName);
 
     const gitProvider = await getRepoGitProvider(repoId);
 

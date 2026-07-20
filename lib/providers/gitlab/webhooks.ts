@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import type { CreateWebhookResult } from "../types";
 import { gitlabFetch, projectPath } from "./client";
 
 type GitlabHook = {
@@ -14,7 +15,7 @@ export async function createRepoWebhook(
   token: string,
   owner: string,
   repo: string,
-): Promise<string> {
+): Promise<CreateWebhookResult> {
   if (!env.GITLAB_WEBHOOK_SECRET) {
     throw new Error(
       "GITLAB_WEBHOOK_SECRET is not configured — cannot create a GitLab webhook without a secret to verify it with.",
@@ -26,7 +27,7 @@ export async function createRepoWebhook(
 
   const existingHooks = await gitlabFetch<GitlabHook[]>(token, `/projects/${id}/hooks`);
   const existing = existingHooks.find((h) => h.url === webhookUrl);
-  if (existing) return String(existing.id);
+  if (existing) return { status: "created", webhookId: String(existing.id) };
 
   const created = await gitlabFetch<GitlabHook>(token, `/projects/${id}/hooks`, {
     method: "POST",
@@ -39,7 +40,7 @@ export async function createRepoWebhook(
     }),
   });
 
-  return String(created.id);
+  return { status: "created", webhookId: String(created.id) };
 }
 
 export async function deleteRepoWebhook(

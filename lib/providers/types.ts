@@ -1,7 +1,5 @@
-// "azure_devops" gets added to this union in Feature 19 alongside its
-// GitProvider implementation, not speculatively here. Mirrors the
-// git_provider Postgres enum.
-export type GitProviderId = "github" | "gitlab";
+// Mirrors the git_provider Postgres enum.
+export type GitProviderId = "github" | "gitlab" | "azure_devops";
 
 export type RemoteRepo = {
   externalId: string;
@@ -71,6 +69,18 @@ export type FileChanges = {
 };
 
 /**
+ * GitHub/GitLab's createRepoWebhook always succeeds or throws — Azure DevOps
+ * can't guarantee that (vso.hooks_write may not be grantable to a given
+ * Entra app registration, only discoverable by the create call itself
+ * 403ing). "manual" means the caller must show the user `secret` to paste
+ * into the provider's own webhook UI; GitHub/GitLab only ever return
+ * "created".
+ */
+export type CreateWebhookResult =
+  | { status: "created"; webhookId: string }
+  | { status: "manual"; secret: string };
+
+/**
  * Everything the review pipeline needs from a git host, implemented once per
  * provider (lib/providers/github, later lib/providers/gitlab and
  * lib/providers/azure-devops) and selected at runtime via a repo's stored
@@ -95,7 +105,7 @@ export type GitProvider = {
     repo: string,
   ): Promise<RemoteRepo | null>;
 
-  createRepoWebhook(token: string, owner: string, repo: string): Promise<string>;
+  createRepoWebhook(token: string, owner: string, repo: string): Promise<CreateWebhookResult>;
   deleteRepoWebhook(
     token: string,
     owner: string,

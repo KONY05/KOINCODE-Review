@@ -13,6 +13,11 @@ const envSchema = z.object({
   // setup done manually first). The webhook route 401s if this is unset
   // rather than the whole app failing to boot without it.
   GITLAB_WEBHOOK_SECRET: z.string().optional(),
+  // Optional for the same reason as GITLAB_WEBHOOK_SECRET above (Feature 19
+  // needs a custom Entra ID app registration set up manually first). Used
+  // as the Basic Auth password only for the auto-created service hook path —
+  // the manual-fallback path uses a per-repo secret instead (repos.webhookSecret).
+  AZURE_DEVOPS_WEBHOOK_SECRET: z.string().optional(),
 
   APP_URL: z.string(),
 

@@ -1,6 +1,26 @@
 import type { DraftReviewComment, PostedComment, ReviewSummary } from "../types";
-import { buildReviewBody, formatCommentBody } from "../review-body";
+import { buildReviewBody } from "../review-body";
 import { gitlabFetch, projectPath } from "./client";
+
+/**
+ * GitLab supports multi-line suggestions via a `:-N+M` offset annotation on
+ * the ```suggestion fence — N lines above the anchored line and M lines
+ * below it get replaced too — unlike GitHub, which instead anchors the
+ * comment itself across a start_line..line range and lets a plain
+ * ```suggestion fence replace that whole range. Our GitLab comment is
+ * always anchored at a single line (comment.line, new_line below), so
+ * multi-line suggestions need this offset instead of a differently
+ * positioned comment. Not part of the shared review-body.ts formatter since
+ * GitHub's/Azure DevOps's plain ```suggestion fence has no such syntax.
+ */
+function formatGitlabCommentBody(comment: DraftReviewComment): string {
+  if (comment.suggestion == null) return comment.body;
+
+  const linesAbove = comment.startLine != null ? Math.max(comment.line - comment.startLine, 0) : 0;
+  const offset = linesAbove > 0 ? `:-${linesAbove}+0` : "";
+
+  return `${comment.body}\n\n\`\`\`suggestion${offset}\n${comment.suggestion}\n\`\`\``;
+}
 
 type GitlabMergeRequest = {
   diff_refs: {
@@ -25,13 +45,16 @@ type GitlabDiscussion = {
  * `headSha`, since GitLab requires all three SHAs to come from the same
  * consistent diff_refs read or the position is silently dropped.
  *
- * Known limitation: always anchors on `comment.line` as the new-file line
- * (position[new_line]) and never sets old_path independently or a
- * multi-line `line_range` — GitHub's `startLine` (multi-line comments) and
- * renamed-file paths aren't represented in this first pass. GitLab responds
- * 201 even when it silently downgrades a position to a plain (unpositioned)
- * note, so `notes[0].type !== "DiffNote"` is checked to log when that happens
- * rather than assuming success.
+ * Known limitation: the *position* always anchors on `comment.line` as the
+ * new-file line (position[new_line]) and never sets old_path independently
+ * or a multi-line `line_range` — but the *suggestion* itself still covers
+ * `comment.startLine..line` via formatGitlabCommentBody's `:-N+0` offset
+ * syntax above, so multi-line fixes apply correctly even though the visible
+ * comment thread is pinned to a single line. Renamed-file paths aren't
+ * represented in this first pass. GitLab responds 201 even when it silently
+ * downgrades a position to a plain (unpositioned) note, so
+ * `notes[0].type !== "DiffNote"` is checked to log when that happens rather
+ * than assuming success.
  */
 export async function postReviewComments(
   token: string,
@@ -62,7 +85,7 @@ export async function postReviewComments(
   for (const comment of comments) {
     if (!patches.has(comment.path)) continue;
 
-    const body = formatCommentBody(comment);
+    const body = formatGitlabCommentBody(comment);
 
     try {
       const discussion = await gitlabFetch<GitlabDiscussion>(

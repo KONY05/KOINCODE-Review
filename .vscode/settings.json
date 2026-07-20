@@ -13,11 +13,14 @@
     "noteable",
     "oldrev",
     "openrouter",
+    "pullrequest",
     "qwen",
     "svix",
     "TOCTOU",
     "unmappable",
+    "unrooted",
     "unsynchronized",
-    "upserted"
+    "upserted",
+    "vssps"
   ]
 }

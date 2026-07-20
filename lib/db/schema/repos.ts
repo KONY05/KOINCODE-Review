@@ -17,8 +17,7 @@ export const indexingStatusEnum = pgEnum("indexing_status", [
   "failed",
 ]);
 
-// "azure_devops" gets added when Feature 19 lands, not speculatively here.
-export const gitProviderEnum = pgEnum("git_provider", ["github", "gitlab"]);
+export const gitProviderEnum = pgEnum("git_provider", ["github", "gitlab", "azure_devops"]);
 
 export const repos = pgTable(
   "repos",
@@ -37,8 +36,17 @@ export const repos = pgTable(
     defaultBranch: text("default_branch").notNull().default("main"),
     isPrivate: boolean("is_private").notNull().default(false),
     // Provider-native webhook/service-hook identifier — text for the same
-    // reason as externalId (Azure DevOps service hook ids are GUIDs).
+    // reason as externalId (Azure DevOps service hook ids are GUIDs). For
+    // Azure DevOps this can hold multiple comma-joined subscription ids,
+    // since one subscription per eventType is required there.
     webhookId: text("webhook_id"),
+    // Per-repo secret for Azure DevOps's manual webhook-setup fallback only
+    // (used when the org's Entra app can't be granted vso.hooks_write and the
+    // user pastes this into Azure DevOps's Service Hooks Basic Auth fields
+    // themselves) — null for every GitHub/GitLab repo and for Azure DevOps
+    // repos whose service hook was auto-created with the shared platform
+    // secret instead.
+    webhookSecret: text("webhook_secret"),
     isActive: boolean("is_active").notNull().default(true),
     indexingStatus: indexingStatusEnum("indexing_status").notNull().default("pending"),
     disconnectedAt: timestamp("disconnected_at"),

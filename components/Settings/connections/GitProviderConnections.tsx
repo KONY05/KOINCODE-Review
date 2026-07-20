@@ -6,9 +6,15 @@ import { GitBranchIcon, CheckIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 type LinkableProvider = {
-  id: "github" | "gitlab";
+  // Clerk's actual externalAccount.provider slug (checked against below via
+  // connectedProviders.has(provider.id)) — not the same namespace as our
+  // internal GitProviderId ("azure_devops"). Azure DevOps has no distinct
+  // Clerk strategy of its own; it rides on the "microsoft" connection, so
+  // this entry's id/strategy say "microsoft" even though the label and the
+  // repos.provider column both say "Azure DevOps"/"azure_devops".
+  id: "github" | "gitlab" | "microsoft";
   label: string;
-  strategy: "oauth_github" | "oauth_gitlab";
+  strategy: "oauth_github" | "oauth_gitlab" | "oauth_microsoft";
   additionalScopes?: string[];
 };
 
@@ -32,6 +38,24 @@ const LINKABLE_PROVIDERS: LinkableProvider[] = [
     // enough). Requested explicitly here since Clerk's dashboard-level
     // default scope for a new social connection is read-oriented.
     additionalScopes: ["api"],
+  },
+  {
+    id: "microsoft",
+    label: "Azure DevOps",
+    strategy: "oauth_microsoft",
+    // Same reasoning as GitLab's `api` scope above: Clerk's dashboard-level
+    // default scope for a new Microsoft connection is basic sign-in
+    // (openid/profile/email), not Azure DevOps API access. These vso.*
+    // scopes are also set as the connection's Scopes field in Clerk's
+    // dashboard (authoritative for every OAuth flow through it) — requested
+    // again here as defense-in-depth, same posture as GitLab.
+    additionalScopes: [
+      "vso.project",
+      "vso.code_full",
+      "vso.code_status",
+      "vso.threads_full",
+      "vso.hooks_write",
+    ],
   },
 ];
 

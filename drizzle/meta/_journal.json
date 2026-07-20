@@ -85,6 +85,13 @@
       "when": 1784215335027,
       "tag": "0011_add-repos-provider-external-id-index",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784299467512,
+      "tag": "0012_add-azure-devops-provider",
+      "breakpoints": true
     }
   ]
 }

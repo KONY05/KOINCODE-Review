@@ -20,7 +20,7 @@ export async function connectRepoForUser(
   provider: GitProviderId,
   repo: RemoteRepo,
   token: string,
-): Promise<{ id: string; indexingStatus: string }> {
+): Promise<{ id: string; indexingStatus: string; manualWebhookSecret?: string }> {
   const result = await db.transaction(async (tx) => {
     const [upserted] = await tx
       .insert(repos)
@@ -54,19 +54,34 @@ export async function connectRepoForUser(
         webhookId: repos.webhookId,
       });
 
+    let manualWebhookSecret: string | undefined;
+
     if (!upserted.webhookId) {
-      const webhookId = await getProvider(provider).createRepoWebhook(
+      const webhookResult = await getProvider(provider).createRepoWebhook(
         token,
         repo.owner,
         repo.name,
       );
-      await tx
-        .update(repos)
-        .set({ webhookId })
-        .where(eq(repos.id, upserted.id));
+
+      if (webhookResult.status === "created") {
+        await tx
+          .update(repos)
+          .set({ webhookId: webhookResult.webhookId })
+          .where(eq(repos.id, upserted.id));
+      } else {
+        // Azure DevOps only, when vso.hooks_write wasn't grantable — no
+        // webhookId to store, just the per-repo secret the user still needs
+        // to paste into the provider's own webhook UI themselves (see
+        // context/feature-spec/19-azure-devops-integration.md).
+        await tx
+          .update(repos)
+          .set({ webhookSecret: webhookResult.secret })
+          .where(eq(repos.id, upserted.id));
+        manualWebhookSecret = webhookResult.secret;
+      }
     }
 
-    return upserted;
+    return { ...upserted, manualWebhookSecret };
   });
 
   if (result.indexingStatus !== "completed") {
