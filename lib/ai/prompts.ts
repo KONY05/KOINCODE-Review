@@ -1,4 +1,4 @@
-type PromptParams = {
+export type PromptParams = {
   prTitle: string;
   headBranch: string;
   baseBranch: string;
@@ -7,6 +7,15 @@ type PromptParams = {
   fileContents: Map<string, string>;
   diff: string;
   repoMemories?: string[];
+  previousReview?: {
+    summary: string;
+    comments: {
+      path: string;
+      line: number;
+      body: string;
+      status: "pending" | "adopted";
+    }[];
+  };
 };
 
 export const REVIEW_SYSTEM_PROMPT = `You are an expert code reviewer. You review code in any language — JavaScript, TypeScript, Python, Go, Rust, Java, C#, Ruby, PHP, Swift, Kotlin, and others. Adapt your review to the language, framework, and conventions visible in the code.
@@ -92,6 +101,7 @@ Rules for inline comments:
 - Skip trivial style nits (formatting, semicolons, trailing commas, whitespace) — linters handle those.
 - Skip praise — only report issues that need attention.
 - If the code looks good and has no issues, return an empty comments array.
+- If a "Previous Review" section is present: don't repeat issues marked already fixed, don't re-raise a still-open issue unless it's genuinely present in the current "Full File Contents"/"Diff", and never re-derive a previously suggested fix as if it were a newly-discovered issue in the current code — treat the previous review as history to build on, not as ground truth about what the code currently looks like.
 
 Line targeting (CRITICAL — wrong lines will corrupt the code when the suggestion is applied):
 - Use the "Full File Contents" section to find the exact line numbers. Count from line 1.
@@ -123,6 +133,28 @@ export function buildReviewPrompt(params: PromptParams): string {
       `## Repository Rules (learned from past reviews)\n\n` +
         `These are conventions and preferences specific to this codebase. Respect them in your review:\n\n` +
         params.repoMemories.map((rule) => `- ${rule}`).join("\n")
+    );
+  }
+
+  if (params.previousReview) {
+    const { summary, comments } = params.previousReview;
+    const pending = comments.filter((c) => c.status === "pending");
+    const adopted = comments.filter((c) => c.status === "adopted");
+
+    sections.push(
+      `## Previous Review\n\n` +
+        `This PR was already reviewed. Here is what the last review found, before this new commit:\n\n` +
+        `**Previous summary:** ${summary}\n\n` +
+        (adopted.length > 0
+          ? `**Already fixed (do not re-flag these):**\n` +
+            adopted.map((c) => `- ${c.path}:${c.line} — ${c.body}`).join("\n") +
+            `\n\n`
+          : "") +
+        (pending.length > 0
+          ? `**Still open as of the last review (verify against the current diff — only re-flag if genuinely still present):**\n` +
+            pending.map((c) => `- ${c.path}:${c.line} — ${c.body}`).join("\n")
+          : "") +
+        `\n\nGround every finding in the current "Full File Contents" and "Diff" sections below, not in what this previous review suggested. If a pending item above isn't actually present in the code as it exists now, don't restate it or "fix" it — that means it was never applied, not that a related-looking fix is due. Don't re-propose the same idea from a pending item under a different name or framing; if a previously suggested fix wasn't applied, say so plainly rather than re-deriving it as if it were a new finding.`
     );
   }
 
