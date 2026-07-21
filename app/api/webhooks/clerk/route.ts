@@ -54,6 +54,19 @@ export async function POST(request: NextRequest) {
 
   const { data } = event;
 
+  const email = data.email_addresses[0]?.email_address;
+
+  // No email on the user.created payload — skip rather than crash;
+  // getAuthUser() already has a fallback that creates the row later once a
+  // real session with fuller Clerk data is available (same "missed/
+  // incomplete webhook" safety net it exists for).
+  if (!email) {
+    console.error("Clerk user.created webhook had no email address, skipping row creation", {
+      clerkId: data.id,
+    });
+    return NextResponse.json({ received: true });
+  }
+
   const githubAccount = data.external_accounts.find(
     (a) => a.provider === "oauth_github"
   );
@@ -67,7 +80,7 @@ export async function POST(request: NextRequest) {
     .insert(users)
     .values({
       clerkId: data.id,
-      email: data.email_addresses[0].email_address,
+      email,
       name: fullName,
       avatarUrl: data.image_url,
       githubUsername: githubAccount?.username ?? null,
