@@ -1,10 +1,10 @@
 import { Octokit } from "@octokit/rest";
 
-import { env } from "@/config/env";
+import { env, getAppUrl } from "@/config/env";
 import type { CreateWebhookResult } from "../types";
 
 function getWebhookUrl(): string {
-  return `${env.APP_URL}/api/webhooks/github`;
+  return `${getAppUrl()}/api/webhooks/github`;
 }
 
 async function findExistingWebhook(

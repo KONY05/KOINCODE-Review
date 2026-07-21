@@ -2,7 +2,7 @@
 
 import { and, eq, ilike } from "drizzle-orm";
 
-import { env } from "@/config/env";
+import { getAppUrl } from "@/config/env";
 import { db } from "@/lib/db";
 import { repos } from "@/lib/db/schema";
 import { getAuthUser } from "@/lib/actions/auth";
@@ -167,7 +167,7 @@ export type ConnectRepoResult = {
    * 403'd (vso.hooks_write wasn't grantable) — the user has to paste this
    * into Azure DevOps's own Service Hooks UI themselves. webhookUrl is
    * included alongside it so the connect dialog can show the exact value to
-   * paste without needing APP_URL client-side.
+   * paste without needing to resolve getAppUrl() client-side.
    */
   manualWebhookSecret?: string;
   webhookUrl?: string;
@@ -199,7 +199,7 @@ export async function connectRepo(
       result.manualWebhookSecret
         ? {
             manualWebhookSecret: result.manualWebhookSecret,
-            webhookUrl: `${env.APP_URL}/api/webhooks/azure-devops`,
+            webhookUrl: `${getAppUrl()}/api/webhooks/azure-devops`,
           }
         : {},
     );

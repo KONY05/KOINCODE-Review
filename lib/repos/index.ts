@@ -153,9 +153,13 @@ export async function disconnectRepoForUser(
 
 /** Looked up by (owner, name) rather than externalId — the CLI only has a git
  * remote's owner/repo to go on, and going through the DB here avoids an extra
- * provider API round trip that connecting doesn't need for a disconnect. */
+ * provider API round trip that connecting doesn't need for a disconnect.
+ * Filtered by provider too — without it, a user with a GitHub repo and a
+ * GitLab repo sharing the same (owner, name) (plausible for a mirrored repo)
+ * would silently match whichever row comes back first. */
 export async function findConnectedRepoExternalId(
   userId: string,
+  provider: GitProviderId,
   owner: string,
   name: string,
 ): Promise<string | null> {
@@ -165,6 +169,7 @@ export async function findConnectedRepoExternalId(
     .where(
       and(
         eq(repos.userId, userId),
+        eq(repos.provider, provider),
         eq(repos.owner, owner),
         eq(repos.name, name),
         eq(repos.isActive, true),
@@ -190,6 +195,7 @@ export type RepoStatus =
 
 export async function getRepoStatusForUser(
   userId: string,
+  provider: GitProviderId,
   owner: string,
   name: string,
 ): Promise<RepoStatus> {
@@ -199,6 +205,7 @@ export async function getRepoStatusForUser(
     .where(
       and(
         eq(repos.userId, userId),
+        eq(repos.provider, provider),
         eq(repos.owner, owner),
         eq(repos.name, name),
         eq(repos.isActive, true),

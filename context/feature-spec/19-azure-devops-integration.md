@@ -88,7 +88,7 @@ This means every `repoFullName.split("/")` call site in the *already-shared* pip
 
 ## Explicitly Not Resolved by This Document
 
-- Whether `vso.hooks_write` actually works — only discoverable by registering the Entra app and testing against a real Azure DevOps org/project.
+- ~~Whether `vso.hooks_write` actually works~~ — **resolved via live testing (post-Feature-20)**: not grantable to the registered Entra app; connecting a real repo correctly falls through to the manual-webhook-setup path, confirmed working end to end.
 - The manual-webhook-setup UI itself (where the user pastes the secret, how we detect they've completed it) — that's Feature 20 territory, same as GitLab's repo-connect UI.
 - Whether Azure DevOps's PR thread creation supports the same `\`\`\`suggestion` fenced-block one-click-apply syntax GitHub/GitLab share — untested; if not, `formatCommentBody`'s shared logic needs an Azure-DevOps-specific override rather than being universally shared.
 

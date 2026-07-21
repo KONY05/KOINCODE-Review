@@ -1,4 +1,4 @@
-import { env } from "@/config/env";
+import { env, getAppUrl } from "@/config/env";
 import type { CreateWebhookResult } from "../types";
 import { gitlabFetch, projectPath } from "./client";
 
@@ -8,7 +8,7 @@ type GitlabHook = {
 };
 
 function getWebhookUrl(): string {
-  return `${env.APP_URL}/api/webhooks/gitlab`;
+  return `${getAppUrl()}/api/webhooks/gitlab`;
 }
 
 export async function createRepoWebhook(

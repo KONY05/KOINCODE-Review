@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { env } from "@/config/env";
+import { env, getAppUrl } from "@/config/env";
 import type { CreateWebhookResult } from "../types";
 import { AzureDevOpsApiError, azureFetch, splitOwner } from "./client";
 
@@ -10,7 +10,7 @@ const EVENT_TYPES = ["git.pullrequest.created", "git.pullrequest.updated"] as co
 export const WEBHOOK_BASIC_AUTH_USERNAME = "koincode";
 
 function getWebhookUrl(): string {
-  return `${env.APP_URL}/api/webhooks/azure-devops`;
+  return `${getAppUrl()}/api/webhooks/azure-devops`;
 }
 
 type AzureSubscription = { id: string };

@@ -35,3 +35,21 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+
+/**
+ * The base URL to use for callbacks (e.g. webhook registration) that must
+ * resolve to the instance actually running the code — not APP_URL's fixed
+ * value, which only makes sense for Production/local dev. Preview
+ * deployments get a unique URL per deployment (Vercel's own VERCEL_URL),
+ * so registering a webhook against the static APP_URL from a Preview build
+ * would point GitHub/GitLab/Azure DevOps at the wrong (e.g. production)
+ * instance — a real problem now that Preview runs against its own Neon
+ * branch DB, not production's.
+ */
+export function getAppUrl(): string {
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return env.APP_URL;
+}

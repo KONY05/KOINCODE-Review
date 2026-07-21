@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const parsed = repoRefSchema.safeParse({
     owner: req.nextUrl.searchParams.get("owner"),
     repo: req.nextUrl.searchParams.get("repo"),
+    provider: req.nextUrl.searchParams.get("provider") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -20,8 +21,8 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { owner, repo: repoName } = parsed.data;
+  const { owner, repo: repoName, provider } = parsed.data;
 
-  const status = await getRepoStatusForUser(auth.userId, owner, repoName);
+  const status = await getRepoStatusForUser(auth.userId, provider, owner, repoName);
   return NextResponse.json(status);
 }

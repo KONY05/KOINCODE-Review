@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireCliToken } from "@/lib/cli-auth";
 import { repoRefSchema } from "@/lib/cli/schemas";
-import { githubProvider } from "@/lib/providers/github";
+import { getProvider } from "@/lib/providers/registry";
 import { disconnectRepoForUser, findConnectedRepoExternalId } from "@/lib/repos";
 import { trackServer } from "@/lib/analytics/mixpanel-server";
 import { EVENTS } from "@/lib/analytics/events";
@@ -20,10 +20,11 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { owner, repo: repoName } = parsed.data;
+  const { owner, repo: repoName, provider } = parsed.data;
 
   const externalId = await findConnectedRepoExternalId(
     auth.userId,
+    provider,
     owner,
     repoName,
   );
@@ -34,13 +35,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Best-effort — a missing/expired GitHub token shouldn't block disconnecting locally.
-  const token = await githubProvider
+  // Best-effort — a missing/expired provider token shouldn't block disconnecting locally.
+  const token = await getProvider(provider)
     .getTokenForClerkUser(auth.clerkId)
     .catch(() => null);
   const repo = await disconnectRepoForUser(
     auth.userId,
-    "github",
+    provider,
     externalId,
     token,
   );
