@@ -49,12 +49,27 @@ export const PROVIDER_CLERK_CONFIG: Record<GitProviderId, ProviderClerkConfig> =
     // is basic sign-in (openid/profile/email), not Azure DevOps API access.
     // Requested again here as defense-in-depth alongside the same scopes
     // set in Clerk's dashboard Scopes field for this connection.
+    //
+    // offline_access is required for Microsoft's identity platform to issue
+    // a refresh token at all — without it, getUserOauthAccessToken() can
+    // come back empty once the short-lived access token expires. Must also
+    // be set in Clerk's dashboard Scopes field, not just here.
+    //
+    // NOT vso.* scope strings — those are Azure DevOps's own legacy OAuth
+    // system (app.vssps.visualstudio.com), a different authorization server
+    // from the Entra ID v2 endpoint Clerk's "microsoft" connection actually
+    // uses. Entra v2 requires custom API scopes to be fully qualified with
+    // the resource's Application ID URI — bare vso.* names aren't valid
+    // scopes here and Entra silently drops them rather than erroring,
+    // producing a Graph-only token with no Azure DevOps audience at all.
+    // 499b84ac-1321-427f-aa17-267ca6975798 is Azure DevOps's resource app
+    // ID; user_impersonation is the one delegated permission it exposes
+    // (see the Feature 19 spec's Auth section — this is also why the Entra
+    // Portal's API-permissions picker only ever showed that one checkbox,
+    // not a granular vso.* list).
     additionalScopes: [
-      "vso.project",
-      "vso.code_full",
-      "vso.code_status",
-      "vso.threads_full",
-      "vso.hooks_write",
+      "offline_access",
+      "499b84ac-1321-427f-aa17-267ca6975798/user_impersonation",
     ],
   },
 };

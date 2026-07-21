@@ -15,9 +15,30 @@ Research + design spec for adding Azure DevOps as a third `GitProvider`. Unlike 
   - `vso.threads_full` — PR comment threads (also **not** inherited by the code scope chain — its own standalone scope)
   - `vso.hooks_write` — creating/deleting service hook (webhook) subscriptions
 
+## Correction (found via live testing, post-implementation): Scope Format Was Wrong
+
+The `vso.*` scope names listed above turned out to be the wrong format for the OAuth path this integration actually uses, discovered when live testing produced a "token not found" error despite a fresh, successful-looking account link. Two different Azure DevOps auth systems exist:
+
+- **Azure DevOps's own legacy OAuth** (`app.vssps.visualstudio.com/oauth2/authorize`) — accepts bare scope strings like `vso.project`/`vso.code_full`. This is what the scope names above were sourced from.
+- **Microsoft Entra ID's v2 identity platform** (`login.microsoftonline.com/.../oauth2/v2.0/authorize`) — what Clerk's "Microsoft" connection actually authenticates through. Custom API scopes here must be fully qualified with the resource's Application ID URI; bare `vso.*` names aren't recognized and get silently dropped rather than erroring, so authorization proceeds but only grants a Microsoft Graph-audience token — no Azure DevOps-audience token is ever issued, which is exactly why token retrieval came back empty.
+
+**Fix**: request the single fully-qualified scope `499b84ac-1321-427f-aa17-267ca6975798/user_impersonation` instead of the granular `vso.*` list (both in Clerk's dashboard Scopes field and `additionalScopes` in code) — `user_impersonation` is the one delegated permission the "Azure DevOps" API actually exposes on an Entra app registration anyway (see below), consistent with the Entra Portal only ever showing that single checkbox rather than a granular scope picker. Also add `offline_access`, required for Microsoft's identity platform to issue a refresh token at all — without it the short-lived (~60-90 min) access token has no way to renew once it expires.
+
+## Correction #2: The Real Blocker Was Admin Consent, Plus a Real Detection Bug
+
+Fixing the scope format above still didn't resolve it — `getUserOauthAccessToken` came back with **zero entries**, not a wrong-scope one. Checked Clerk's raw external-account record directly (Clerk Dashboard → Users → this user → the record's `verification` sub-object): `status: "expired"`, `code: "oauth_access_denied"`, `"You did not grant access to your Microsoft account"`, with every actual identity field (`provider_user_id`, `approved_scopes`, `email_address`) empty.
+
+**Root cause**: the Azure DevOps API permission requires Entra admin consent (most non-Microsoft-Graph API permissions do, by default), and it was never explicitly granted via the "Grant admin consent for [tenant]" button on the app registration's API permissions blade — Microsoft rejects the entire authorization with `access_denied` rather than proceeding with a reduced scope set.
+
+**Real bug this exposed**: `listLinkedProviders()` (`lib/actions/repos.ts`) and `GitProviderConnections.tsx`'s connected-state check both treated *any* `externalAccounts` entry as "connected," without checking `verification.status`. Clerk creates the external-account row as soon as an OAuth flow *starts*, before it's known to succeed — so a denied authorization like this one looked identical to a real, working connection in both the repos page's provider selector and the Settings page's "connected" badge, despite there being no usable token behind it at all. Fixed by requiring `verification?.status === "verified"` in both places.
+
 ## The Blocker: Service Hook Scope May Not Be Grantable
 
 Microsoft's own scope reference table marks `vso.hooks`, `vso.hooks_write`, and `vso.hooks_interact` **"(No longer public.)"** — genuinely unclear whether a newly-registered (2026) app can be granted delegated permission to manage service hook subscriptions at all. This isn't discoverable without actually registering an app and testing it.
+
+**Resolved via live testing.** The scope itself turned out not to be the limiting factor at all — the `user_impersonation` grant (see the correction above) is broad enough to attempt the call. What actually blocks it is the identity's own **Azure DevOps organization-level permission**: creating/managing service hook subscriptions requires "Edit subscription" rights, which are effectively Project Collection Administrator-level — well above the "Basic" access level a normal added org member gets. A test account added as a regular member hit this immediately.
+
+**Real bug this exposed**: Azure DevOps doesn't return 403 for this — it returns **400**, an `ArgumentException` with a plain-English message ("The user '...' does not have permission to edit a subscription."). `createRepoWebhook`'s fallback-to-manual logic only checked for a literal 403, so this specific, apparently-common case wasn't caught at all and instead broke the whole `connectRepoForUser` transaction with an unhandled error. Fixed with an `isPermissionDenied()` check that also matches a 400 whose message contains "does not have permission" (`lib/providers/azure-devops/webhooks.ts`). Given how easily a normal org member hits this, the manual-setup fallback path is likely to be the *common* case for Azure DevOps repos, not a rare edge case — worth keeping in mind for how prominently Feature 20's connect-repo UI surfaces it.
 
 **Decision — hybrid, not manual-only:** don't gate the whole feature on this being resolved in advance, and don't design for manual-only either (that regresses every user's experience for a risk that may not materialize). Instead:
 1. Request `vso.hooks_write` during account linking regardless (costs nothing to ask for).

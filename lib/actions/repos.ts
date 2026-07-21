@@ -25,13 +25,26 @@ type ListReposData = {
   hasNextPage: boolean;
 };
 
-/** The git providers the signed-in user has actually linked a Clerk OAuth connection for — drives the repos page's provider selector so an account never sees a provider it can't fetch repos from. */
+/**
+ * The git providers the signed-in user has actually linked a Clerk OAuth
+ * connection for — drives the repos page's provider selector so an account
+ * never sees a provider it can't fetch repos from.
+ *
+ * Requires verification.status === "verified", not just presence in
+ * externalAccounts — Clerk creates an external-account row as soon as an
+ * OAuth flow *starts*, before it's known to succeed. A denied/failed
+ * authorization (e.g. Microsoft's oauth_access_denied when Entra admin
+ * consent wasn't granted) still leaves a row behind with every actual field
+ * empty, which would otherwise show up here as "linked" despite there
+ * being no usable token behind it at all.
+ */
 export async function listLinkedProviders(): Promise<GitProviderId[]> {
   const clerkUser = await currentUser();
   if (!clerkUser) return [];
 
   const linked = new Set<GitProviderId>();
   for (const account of clerkUser.externalAccounts) {
+    if (account.verification?.status !== "verified") continue;
     const providerId = gitProviderIdForClerkSlug(account.provider);
     if (providerId) linked.add(providerId);
   }

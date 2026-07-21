@@ -98,9 +98,16 @@ export default function GitProviderConnections() {
 
   // Checked against Clerk's own provider slug, not our internal
   // GitProviderId — Azure DevOps's externalAccounts entry says "microsoft",
-  // not "azure_devops".
+  // not "azure_devops". Also requires verification.status === "verified" —
+  // Clerk creates an externalAccounts row as soon as an OAuth flow starts,
+  // before it's known to succeed, so a denied/failed authorization (e.g.
+  // Microsoft's oauth_access_denied when Entra admin consent wasn't
+  // granted) would otherwise show up here as "connected" despite there
+  // being no usable token behind it.
   const connectedSlugs = new Set(
-    user?.externalAccounts.map((account) => account.provider) ?? [],
+    (user?.externalAccounts ?? [])
+      .filter((account) => account.verification?.status === "verified")
+      .map((account) => account.provider),
   );
 
   return (

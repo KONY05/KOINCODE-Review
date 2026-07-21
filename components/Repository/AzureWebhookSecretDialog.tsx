@@ -20,6 +20,37 @@ type AzureWebhookSecretDialogProps = {
   repoName: string;
 };
 
+type CopyableFieldProps = {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+};
+
+/** Shared by the Secret and Webhook URL rows below — both need the same truncate + copy-button + "Copied" feedback behavior, and the URL can be just as long as the secret (ngrok tunnel URLs in particular), so both need a copy affordance rather than relying on the truncated display. */
+function CopyableField({ label, value, copied, onCopy }: CopyableFieldProps) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 text-[12px] font-semibold text-(--kc-text-secondary)">{label}</p>
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-(--kc-border) bg-muted/40 px-3 py-2">
+        <code className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{value}</code>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-(--kc-border) px-2.5 py-1 text-[12px] font-medium cursor-pointer transition-colors hover:border-[rgba(245,166,35,0.5)]"
+        >
+          {copied ? (
+            <CheckIcon className="size-3.5 text-kc-green" />
+          ) : (
+            <CopyIcon className="size-3.5" />
+          )}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Shown when connecting an Azure DevOps repo whose service hook couldn't be
  * auto-created (vso.hooks_write wasn't grantable — see the Feature 19 spec).
@@ -34,13 +65,13 @@ export default function AzureWebhookSecretDialog({
   webhookUrl,
   repoName,
 }: AzureWebhookSecretDialogProps) {
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<"secret" | "url" | null>(null);
 
-  async function handleCopy() {
-    await navigator.clipboard.writeText(secret);
-    setCopied(true);
-    toast.success("Secret copied to clipboard.");
-    setTimeout(() => setCopied(false), 2000);
+  async function handleCopy(field: "secret" | "url", value: string, label: string) {
+    await navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    toast.success(`${label} copied to clipboard.`);
+    setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 2000);
   }
 
   return (
@@ -54,36 +85,20 @@ export default function AzureWebhookSecretDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
-          <div>
-            <p className="mb-1.5 text-[12px] font-semibold text-(--kc-text-secondary)">
-              Secret
-            </p>
-            <div className="flex items-center gap-2 rounded-lg border border-(--kc-border) bg-muted/40 px-3 py-2">
-              <code className="flex-1 truncate font-mono text-[12.5px]">{secret}</code>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex shrink-0 items-center gap-1.5 rounded-md border border-(--kc-border) px-2.5 py-1 text-[12px] font-medium cursor-pointer transition-colors hover:border-[rgba(245,166,35,0.5)]"
-              >
-                {copied ? (
-                  <CheckIcon className="size-3.5 text-kc-green" />
-                ) : (
-                  <CopyIcon className="size-3.5" />
-                )}
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-          </div>
+        <div className="flex min-w-0 flex-col gap-3">
+          <CopyableField
+            label="Secret"
+            value={secret}
+            copied={copiedField === "secret"}
+            onCopy={() => handleCopy("secret", secret, "Secret")}
+          />
 
-          <div>
-            <p className="mb-1.5 text-[12px] font-semibold text-(--kc-text-secondary)">
-              Webhook URL
-            </p>
-            <code className="block truncate rounded-lg border border-(--kc-border) bg-muted/40 px-3 py-2 font-mono text-[12.5px]">
-              {webhookUrl}
-            </code>
-          </div>
+          <CopyableField
+            label="Webhook URL"
+            value={webhookUrl}
+            copied={copiedField === "url"}
+            onCopy={() => handleCopy("url", webhookUrl, "Webhook URL")}
+          />
 
           <ol className="mt-1 list-decimal space-y-1.5 pl-4 text-[13px] text-(--kc-text-secondary)">
             <li>

@@ -50,10 +50,29 @@ async function deleteSubscription(token: string, organization: string, id: strin
 }
 
 /**
+ * Confirmed via live testing: Azure DevOps doesn't actually return 403 for
+ * "this identity lacks permission to manage service hook subscriptions" —
+ * it returns 400 with an ArgumentException whose message says so in plain
+ * English ("The user '...' does not have permission to edit a
+ * subscription."). Org-level "Edit subscription" rights are typically
+ * reserved for Project Collection Administrators, well above the "Basic"
+ * access level most linked accounts will have — so this is actually the
+ * *common* case for the hooks_write scope being technically granted by
+ * Entra but still not usable, not an edge case.
+ */
+function isPermissionDenied(error: unknown): boolean {
+  if (!(error instanceof AzureDevOpsApiError)) return false;
+  if (error.status === 403) return true;
+  return error.status === 400 && /does not have permission/i.test(error.message);
+}
+
+/**
  * Hybrid, per the Feature 19 spec: Microsoft's docs mark vso.hooks_write as
  * "no longer public," so whether a given Entra app registration can actually
- * manage service hook subscriptions is only discoverable by trying — a 403
- * here falls back to a manual setup result rather than throwing.
+ * manage service hook subscriptions is only discoverable by trying — a
+ * permission-denied response (see isPermissionDenied above — confirmed via
+ * live testing to actually come back as a 400, not 403) falls back to a
+ * manual setup result rather than throwing.
  *
  * One subscription per eventType is required (Azure DevOps has no single
  * webhook covering multiple event types the way GitHub's/GitLab's single
@@ -102,7 +121,7 @@ export async function createRepoWebhook(
       await deleteSubscription(token, organization, id).catch(() => {});
     }
 
-    if (error instanceof AzureDevOpsApiError && error.status === 403) {
+    if (isPermissionDenied(error)) {
       return { status: "manual", secret: crypto.randomBytes(32).toString("hex") };
     }
 
