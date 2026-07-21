@@ -1,69 +1,50 @@
 import {
   GitBranchIcon,
-  GitCommitHorizontalIcon,
-  GitPullRequestIcon,
   MessageSquareIcon,
+  BugIcon,
+  TrendingUpIcon,
 } from "lucide-react";
 
-import { MONTH_LABELS } from "@/lib/constants";
-import type { ContributionStats } from "@/lib/providers/github/contributions";
+import type { DashboardStats } from "@/lib/actions/reviews";
 
-function getYearRange() {
-  const now = new Date();
-  const yearAgo = new Date(now);
-  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-  return `(${MONTH_LABELS[yearAgo.getMonth()]} ${yearAgo.getFullYear()} – ${MONTH_LABELS[now.getMonth()]} ${now.getFullYear()})`;
-}
-
-export default function Stats({
-  contributionStats,
-  totalReviews,
-}: {
-  contributionStats: ContributionStats | null;
-  totalReviews: number;
-}) {
-  const range = getYearRange();
-
-  const stats = [
+export default function Stats({ stats }: { stats: DashboardStats | null }) {
+  const items = [
     {
-      label: "Total Repositories",
-      value: contributionStats
-        ? String(contributionStats.totalRepositoriesContributedTo)
-        : "—",
-      sub: "Contributed to this year",
+      label: "Connected Repositories",
+      value: stats ? String(stats.connectedRepos) : "—",
+      sub: "Across all providers",
       icon: GitBranchIcon,
       accent: false,
     },
     {
-      label: "Total Commits",
-      value: contributionStats
-        ? String(contributionStats.totalCommits)
-        : "—",
-      sub: `In the last year ${range}`,
-      icon: GitCommitHorizontalIcon,
-      accent: false,
-    },
-    {
-      label: "Pull Requests",
-      value: contributionStats
-        ? String(contributionStats.totalPullRequests)
-        : "—",
-      sub: `In the last year ${range}`,
-      icon: GitPullRequestIcon,
-      accent: false,
-    },
-    {
-      label: "AI Reviews",
-      value: String(totalReviews),
-      sub: "Completed reviews",
+      label: "Reviews Completed",
+      value: stats ? String(stats.completedReviews) : "—",
+      sub: "In the last year",
       icon: MessageSquareIcon,
+      accent: false,
+    },
+    {
+      label: "Issues Found",
+      value: stats ? String(stats.issuesFound) : "—",
+      sub: "Comments left in the last year",
+      icon: BugIcon,
+      accent: false,
+    },
+    {
+      label: "Adoption Rate",
+      value:
+        stats?.adoptionRate != null
+          ? `${Math.round(stats.adoptionRate * 100)}%`
+          : "—",
+      sub: "Suggestions applied",
+      icon: TrendingUpIcon,
       accent: true,
     },
   ];
 
   return (
     <div className="mt-8 flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
-      {stats.map((s) => (
+      {items.map((s) => (
         <div
           key={s.label}
           className="min-w-[200px] shrink-0 rounded-2xl border border-(--kc-border-subtle) bg-card p-5 sm:min-w-0 sm:shrink"

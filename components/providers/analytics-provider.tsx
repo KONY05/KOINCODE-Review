@@ -14,7 +14,7 @@ type AnalyticsUser = {
   id: string;
   email: string;
   name: string;
-  githubUsername: string;
+  gitUsername: string;
 };
 
 export function AnalyticsProvider({
@@ -30,7 +30,7 @@ export function AnalyticsProvider({
   useEffect(() => {
     initMixpanelClient();
     identifyUser(user.id, {
-      github_username: user.githubUsername,
+      git_username: user.gitUsername,
       email: user.email,
       name: user.name,
     });

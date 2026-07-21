@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { findSignupUsername } from "@/lib/providers/clerk-mapping";
 
 export async function getAuthUser() {
   let clerkUser;
@@ -30,13 +31,11 @@ export async function getAuthUser() {
 
   if (!email) return null;
 
-  const githubAccount = clerkUser.externalAccounts.find(
-    (a) => a.provider === "oauth_github" || a.provider === "github"
-  );
+  const signupUsername = findSignupUsername(clerkUser.externalAccounts);
 
   const fullName =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-    githubAccount?.username ||
+    signupUsername ||
     null;
 
   const [createdUser] = await db
@@ -46,7 +45,7 @@ export async function getAuthUser() {
       email,
       name: fullName,
       avatarUrl: clerkUser.imageUrl,
-      githubUsername: githubAccount?.username ?? null,
+      gitUsername: signupUsername,
     })
     .onConflictDoNothing({ target: users.clerkId })
     .returning();

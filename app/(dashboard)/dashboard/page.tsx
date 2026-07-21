@@ -1,26 +1,25 @@
 import type { Metadata } from "next";
 
 import Stats from "@/components/Dashboard/Stats";
-import GithubActivity from "@/components/Dashboard/GithubActivity";
+import ReviewActivity from "@/components/Dashboard/ReviewActivity";
 import ActivityOverview from "@/components/Dashboard/ActivityOverview";
-import { getGithubToken, getContributions } from "@/lib/providers/github";
 import {
-  fetchReviewsSummary,
+  fetchDashboardStats,
+  fetchDailyReviewCounts,
   fetchMonthlyReviewCounts,
 } from "@/lib/actions/reviews";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const [token, summaryResult, monthlyResult] = await Promise.all([
-    getGithubToken(),
-    fetchReviewsSummary(),
+  const [statsResult, dailyResult, monthlyResult] = await Promise.all([
+    fetchDashboardStats(),
+    fetchDailyReviewCounts(),
     fetchMonthlyReviewCounts(),
   ]);
 
-  const contributions = token ? await getContributions(token) : null;
-
-  const totalReviews = summaryResult.success ? summaryResult.data.completed : 0;
+  const stats = statsResult.success ? statsResult.data : null;
+  const dailyReviews = dailyResult.success ? dailyResult.data : null;
   const monthlyReviews = monthlyResult.success ? monthlyResult.data : [];
 
   return (
@@ -30,17 +29,11 @@ export default async function DashboardPage() {
         Overview of your coding activity and AI reviews
       </p>
 
-      <Stats
-        contributionStats={contributions?.stats ?? null}
-        totalReviews={totalReviews}
-      />
+      <Stats stats={stats} />
 
-      <GithubActivity calendar={contributions?.calendar ?? null} />
+      <ReviewActivity dailyReviews={dailyReviews} />
 
-      <ActivityOverview
-        monthlyActivity={contributions?.monthlyActivity ?? null}
-        monthlyReviews={monthlyReviews}
-      />
+      <ActivityOverview monthlyReviews={monthlyReviews} />
     </div>
   );
 }

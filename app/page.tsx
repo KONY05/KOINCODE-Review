@@ -1,7 +1,7 @@
 import { CheckIcon } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { GitHubSignInButton } from "@/components/github-sign-in-button";
+import { ProviderSignInButtons } from "@/components/provider-sign-in-buttons";
 import LockIcon from "@/components/icon/LockIcon";
 import Logo from "@/components/Logo";
 
@@ -54,10 +54,10 @@ export default function LandingPage() {
             Welcome back
           </h2>
           <p className="text-(--kc-text-secondary) mt-2 mb-7 text-[14.5px]">
-            Login with your GitHub account to connect repositories.
+            Connect your git provider to start reviewing pull requests.
           </p>
 
-          <GitHubSignInButton />
+          <ProviderSignInButtons />
 
           <div className="flex items-center gap-3.5 my-6">
             <div className="flex-1 h-px bg-(--kc-border)" />

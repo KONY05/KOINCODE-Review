@@ -39,9 +39,17 @@ export async function listUserRepos(
   page: number = 1,
   perPage: number = 20,
 ): Promise<{ repos: RemoteRepo[]; hasNextPage: boolean }> {
+  // No order_by/sort at all — confirmed via live testing that GitLab's API
+  // 500s on membership=true + order_by/sort (tried both last_activity_at
+  // and updated_at) when authenticated via an OAuth Bearer token, even
+  // though the identical membership=true query with no sort params
+  // succeeds fine via a Personal Access Token. Apparently OAuth-token-
+  // authenticated requests hit a different, broken code path for sorted
+  // membership queries on GitLab's end. Dropping sorting entirely sidesteps
+  // it; GitLab's own default ordering (created_at) applies instead.
   const { items, hasNextPage } = await gitlabFetchPaginated<GitlabProject[]>(
     token,
-    `/projects?membership=true&order_by=last_activity_at&sort=desc&per_page=${perPage}&page=${page}`,
+    `/projects?membership=true&per_page=${perPage}&page=${page}`,
   );
 
   return { repos: items.map(toRemoteRepo), hasNextPage };

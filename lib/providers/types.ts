@@ -82,12 +82,9 @@ export type CreateWebhookResult =
 
 /**
  * Everything the review pipeline needs from a git host, implemented once per
- * provider (lib/providers/github, later lib/providers/gitlab and
+ * provider (lib/providers/github, lib/providers/gitlab,
  * lib/providers/azure-devops) and selected at runtime via a repo's stored
- * `provider` column (see lib/providers/registry.ts). Session-scoped token
- * convenience helpers (e.g. GitHub's getGithubToken()) and provider-only
- * bonus features (e.g. GitHub's contribution graph) intentionally live
- * outside this interface — they don't generalize across providers.
+ * `provider` column (see lib/providers/registry.ts).
  */
 export type GitProvider = {
   readonly id: GitProviderId;

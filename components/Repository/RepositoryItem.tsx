@@ -9,6 +9,7 @@ import { connectRepo, disconnectRepo } from "@/lib/actions/repos";
 import { formatRelativeTime } from "@/lib/utils";
 import { LANGUAGE_COLORS } from "@/lib/constants";
 import { toast } from "sonner";
+import AzureWebhookSecretDialog from "./AzureWebhookSecretDialog";
 
 type RepositoryItemProps = {
   repo: RepoWithStatus;
@@ -17,6 +18,9 @@ type RepositoryItemProps = {
 export default function RepositoryItem({ repo }: RepositoryItemProps) {
   const [connected, setConnected] = useState(repo.isConnected);
   const [loading, setLoading] = useState(false);
+  const [manualWebhook, setManualWebhook] = useState<{ secret: string; webhookUrl: string } | null>(
+    null,
+  );
 
   const langColor = repo.language
     ? LANGUAGE_COLORS[repo.language] ?? "#7e858f"
@@ -27,11 +31,17 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
     setConnected(!connected);
 
     const result = connected
-      ? await disconnectRepo(repo.externalId)
-      : await connectRepo(repo);
+      ? await disconnectRepo(repo.externalId, repo.provider)
+      : await connectRepo(repo, repo.provider);
 
     if (result.success) {
       toast.success(connected ? "Repository disconnected." : "Repository connected.");
+      if (!connected && result.data?.manualWebhookSecret && result.data.webhookUrl) {
+        setManualWebhook({
+          secret: result.data.manualWebhookSecret,
+          webhookUrl: result.data.webhookUrl,
+        });
+      }
     } else {
       setConnected(connected);
       toast.error(result.error);
@@ -105,6 +115,18 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
           "Connect"
         )}
       </button>
+
+      {manualWebhook && (
+        <AzureWebhookSecretDialog
+          open={!!manualWebhook}
+          onOpenChange={(open) => {
+            if (!open) setManualWebhook(null);
+          }}
+          secret={manualWebhook.secret}
+          webhookUrl={manualWebhook.webhookUrl}
+          repoName={repo.name}
+        />
+      )}
     </div>
   );
 }

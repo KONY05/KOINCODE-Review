@@ -12,7 +12,6 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 
-import GitHubIcon from "@/components/icon/GithubIcon";
 import {
   Sidebar,
   SidebarContent,
@@ -58,7 +57,7 @@ interface AppSidebarProps {
     name: string | null;
     email: string;
     avatarUrl: string | null;
-    githubUsername: string | null;
+    gitUsername: string | null;
   };
 }
 
@@ -102,14 +101,18 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3 rounded-xl border border-(--kc-border) bg-(--kc-surface) p-3 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent">
           <div className="flex size-[42px] shrink-0 items-center justify-center rounded-[11px] bg-(--kc-cream) text-(--kc-cream-text)">
-            <GitHubIcon className="size-[22px]" />
+            {/* Generic git icon, not a specific provider's brand mark — we
+                don't track which provider an account signed up with as its
+                own field, only gitUsername (a username, not a provider id),
+                and an account can have multiple providers linked anyway. */}
+            <GitBranchIcon className="size-[22px]" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="text-[11px] font-medium text-(--kc-text-muted)">
               Connected Account
             </div>
             <div className="mt-0.5 truncate text-[13.5px] font-semibold leading-tight">
-              @{user.githubUsername ?? user.name ?? "user"}
+              @{user.gitUsername ?? user.name ?? "user"}
             </div>
           </div>
         </div>

@@ -33,7 +33,7 @@ pnpm db:migrate   # Run Drizzle migrations (once Drizzle is set up)
 ## Environment Setup
 
 ```bash
-# Auth (Clerk — GitHub OAuth only, no sign-in/sign-up pages)
+# Auth (Clerk — GitHub/GitLab/Azure DevOps OAuth, no separate sign-in/sign-up pages)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=   # Clerk publishable key
 CLERK_SECRET_KEY=                     # Clerk secret key
 
@@ -54,6 +54,9 @@ GITHUB_WEBHOOK_SECRET=                # GitHub webhook signing secret
 # GitLab (optional — only needed once GitLab is enabled as a Clerk social connection)
 GITLAB_WEBHOOK_SECRET=                # GitLab webhook secret token (sent via X-Gitlab-Token header)
 
+# Azure DevOps (optional — only needed once a custom Entra ID app registration is set up as Clerk's Microsoft connection)
+AZURE_DEVOPS_WEBHOOK_SECRET=          # Basic Auth password for auto-created service hooks (manual-setup repos use a per-repo secret instead)
+
 # Encryption
 ENCRYPTION_KEY=                       # AES-256-GCM key for encrypting user API keys at rest (openssl rand -hex 32)
 
@@ -67,12 +70,12 @@ GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for gemini-embedding-
 - `app/layout.tsx` — Root layout with Clerk provider and font setup.
 - `app/page.tsx` — Landing page.
 - `app/(dashboard)/` — Authenticated dashboard routes (repos, reviews, settings).
-- `app/api/webhooks/` — Webhook endpoints (GitHub PR events, Clerk user events).
+- `app/api/webhooks/` — Webhook endpoints (GitHub/GitLab/Azure DevOps PR events, Clerk user events).
 - `app/api/inngest/` — Inngest serve endpoint for background job processing.
 
 ### Business Logic (`lib/`)
 - `lib/ai/` — LLM provider abstraction, prompt templates, review agent orchestration.
-- `lib/github/` — Octokit client, webhook verification, PR diff fetching, review comment posting, commit creation.
+- `lib/providers/` — `GitProvider` interface plus one implementation per git host (`github/`, `gitlab/`, `azure-devops/`), selected at runtime via `lib/providers/registry.ts` based on a repo's stored `provider` column.
 - `lib/db/` — Drizzle client setup, schema definitions (`db/schema/`), query helpers.
 - `lib/vector/` — Pinecone client, embedding generation, context retrieval.
 - `lib/inngest/` — Inngest client, event definitions, background job functions (review, indexing).
@@ -91,6 +94,6 @@ GOOGLE_GENERATIVE_AI_API_KEY=          # Google AI API key for gemini-embedding-
 - **Inngest for background jobs:** Event-driven architecture with built-in retries. Reviews are processed async — the webhook endpoint enqueues, the job executes.
 - **Server Components first:** Data fetching happens in Server Components. Client Components are only used when browser APIs or interactivity are required.
 - **Encrypted API key storage:** User LLM keys are AES-256-GCM encrypted at rest and only decrypted inside background jobs at the moment of LLM invocation.
-- **Direct GitHub OAuth:** No sign-in/sign-up pages. Single login button triggers Clerk's GitHub OAuth flow directly.
+- **Multi-provider OAuth, no separate sign-in/sign-up pages:** The landing page offers GitHub/GitLab/Azure DevOps sign-in buttons directly (no dedicated sign-up flow). A user can also link additional providers onto an existing account from Settings — one account, multiple connected git hosts, not a separate identity per provider.
 
 @AGENTS.md

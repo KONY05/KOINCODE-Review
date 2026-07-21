@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatRelativeTime } from "@/lib/utils";
 import type { ReviewEntry } from "@/lib/actions/reviews";
+import { PROVIDER_CLERK_CONFIG } from "@/lib/providers/clerk-mapping";
 
 const STATUS_CONFIG = {
   pending: {
@@ -42,6 +43,7 @@ export default function ReviewItem({ review }: { review: ReviewEntry }) {
   const config = STATUS_CONFIG[review.status];
   const StatusIcon = config.icon;
   const commentCount = review.comments?.length ?? 0;
+  const providerLabel = PROVIDER_CLERK_CONFIG[review.provider].label;
 
   return (
     <div className="rounded-2xl border border-(--kc-border-subtle) bg-card p-6 transition-colors hover:border-(--kc-border)">
@@ -98,7 +100,7 @@ export default function ReviewItem({ review }: { review: ReviewEntry }) {
           className="inline-flex items-center gap-1.5 rounded-lg bg-(--kc-cream) px-3.5 py-1.5 text-[13px] font-semibold text-(--kc-cream-text) transition-colors hover:bg-(--kc-cream-hover)"
         >
           <ExternalLinkIcon className="size-3.5" />
-          View on GitHub
+          View on {providerLabel}
         </Link>
         {commentCount > 0 && (
           <>

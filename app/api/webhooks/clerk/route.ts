@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { env } from "@/config/env";
+import { findSignupUsername } from "@/lib/providers/clerk-mapping";
 
 interface ClerkWebhookEvent {
   type: string;
@@ -54,13 +55,11 @@ export async function POST(request: NextRequest) {
 
   const { data } = event;
 
-  const githubAccount = data.external_accounts.find(
-    (a) => a.provider === "oauth_github"
-  );
+  const signupUsername = findSignupUsername(data.external_accounts);
 
   const fullName =
     [data.first_name, data.last_name].filter(Boolean).join(" ") ||
-    githubAccount?.username ||
+    signupUsername ||
     null;
 
   await db
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
       email: data.email_addresses[0].email_address,
       name: fullName,
       avatarUrl: data.image_url,
-      githubUsername: githubAccount?.username ?? null,
+      gitUsername: signupUsername,
     })
     .onConflictDoNothing({ target: users.clerkId });
 

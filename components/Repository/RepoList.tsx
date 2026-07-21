@@ -1,11 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { RepoWithStatus } from "@/lib/actions/repos";
-import { listGithubRepos, listConnectedRepos } from "@/lib/actions/repos";
+import { listProviderRepos, listConnectedRepos } from "@/lib/actions/repos";
+import type { GitProviderId } from "@/lib/providers/types";
+import { PROVIDER_CLERK_CONFIG } from "@/lib/providers/clerk-mapping";
 import RepoSearchInput from "./RepoSearchInput";
 import RepoTabs from "./RepoTabs";
+import ProviderSelector from "./ProviderSelector";
 import RepositoryItem from "./RepositoryItem";
 import RepositoryItemSkeleton from "./RepositoryItemSkeleton";
 
@@ -15,13 +19,19 @@ type RepoListProps = {
   initialRepos: RepoWithStatus[];
   initialHasNextPage: boolean;
   initialError: string | null;
+  initialProvider: GitProviderId;
+  availableProviders: GitProviderId[];
 };
 
 export default function RepoList({
   initialRepos,
   initialHasNextPage,
   initialError,
+  initialProvider,
+  availableProviders,
 }: RepoListProps) {
+  const router = useRouter();
+  const [provider, setProvider] = useState(initialProvider);
   const [tab, setTab] = useState<Tab>("all");
   const [repos, setRepos] = useState(initialRepos);
   const [page, setPage] = useState(1);
@@ -31,6 +41,8 @@ export default function RepoList({
   const [error, setError] = useState<string | null>(initialError);
   const [initialLoading, setInitialLoading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const providerLabel = PROVIDER_CLERK_CONFIG[provider].label;
 
   const displayedRepos = useMemo(() => {
     if (tab === "all" && search) {
@@ -42,7 +54,13 @@ export default function RepoList({
   }, [repos, tab, search]);
 
   const fetchRepos = useCallback(
-    async (pageNum: number, query: string, currentTab: Tab, append: boolean) => {
+    async (
+      pageNum: number,
+      query: string,
+      currentTab: Tab,
+      currentProvider: GitProviderId,
+      append: boolean
+    ) => {
       if (append) {
         setLoading(true);
       } else {
@@ -52,7 +70,7 @@ export default function RepoList({
 
       const result =
         currentTab === "all"
-          ? await listGithubRepos(pageNum)
+          ? await listProviderRepos(currentProvider, pageNum)
           : await listConnectedRepos(pageNum, 20, query || undefined);
 
       if (!result.success) {
@@ -86,7 +104,7 @@ export default function RepoList({
         if (entries[0]?.isIntersecting && hasNextPage && !loading) {
           const nextPage = page + 1;
           setPage(nextPage);
-          fetchRepos(nextPage, search, tab, true);
+          fetchRepos(nextPage, search, tab, provider, true);
         }
       },
       { rootMargin: "200px" }
@@ -94,7 +112,7 @@ export default function RepoList({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, loading, page, search, tab, fetchRepos]);
+  }, [hasNextPage, loading, page, search, tab, provider, fetchRepos]);
 
   const handleTabChange = useCallback(
     (newTab: Tab) => {
@@ -104,9 +122,24 @@ export default function RepoList({
       setRepos([]);
       setHasNextPage(false);
       setError(null);
-      fetchRepos(1, "", newTab, false);
+      fetchRepos(1, "", newTab, provider, false);
     },
-    [fetchRepos]
+    [fetchRepos, provider]
+  );
+
+  const handleProviderChange = useCallback(
+    (newProvider: GitProviderId) => {
+      setProvider(newProvider);
+      setTab("all");
+      setSearch("");
+      setPage(1);
+      setRepos([]);
+      setHasNextPage(false);
+      setError(null);
+      fetchRepos(1, "", "all", newProvider, false);
+      router.replace(`/repos?provider=${newProvider}`, { scroll: false });
+    },
+    [fetchRepos, router]
   );
 
   const handleSearch = useCallback(
@@ -114,10 +147,10 @@ export default function RepoList({
       setSearch(query);
       if (tab === "connected") {
         setPage(1);
-        fetchRepos(1, query, tab, false);
+        fetchRepos(1, query, tab, provider, false);
       }
     },
-    [tab, fetchRepos]
+    [tab, provider, fetchRepos]
   );
 
   const showEmpty = !initialLoading && !error && displayedRepos.length === 0;
@@ -130,11 +163,21 @@ export default function RepoList({
             Repositories
           </h1>
           <p className="mt-1.5 text-[15px] text-(--kc-text-secondary)">
-            Manage and view all your GitHub repositories
+            Manage and view all your {providerLabel} repositories
           </p>
         </div>
         <RepoTabs activeTab={tab} onTabChange={handleTabChange} />
       </div>
+
+      {availableProviders.length > 1 && tab === "all" && (
+        <div className="mt-4">
+          <ProviderSelector
+            providers={availableProviders}
+            activeProvider={provider}
+            onProviderChange={handleProviderChange}
+          />
+        </div>
+      )}
 
       <div className="mt-8">
         <RepoSearchInput onSearch={handleSearch} />
@@ -152,7 +195,7 @@ export default function RepoList({
               <RepositoryItemSkeleton key={i} />
             ))
           : displayedRepos.map((repo) => (
-              <RepositoryItem key={repo.externalId} repo={repo} />
+              <RepositoryItem key={`${repo.provider}-${repo.externalId}`} repo={repo} />
             ))}
 
         {loading &&
@@ -166,7 +209,7 @@ export default function RepoList({
           {tab === "all"
             ? search
               ? `No repositories matching "${search}".`
-              : "No repositories found. Make sure your GitHub account has accessible repositories."
+              : `No repositories found. Make sure your ${providerLabel} account has accessible repositories.`
             : search
               ? `No connected repositories matching "${search}".`
               : "No connected repositories yet. Connect a repo to start receiving AI reviews."}

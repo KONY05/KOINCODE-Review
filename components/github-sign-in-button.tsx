@@ -18,7 +18,7 @@ export function GitHubSignInButton({ redirectUrlComplete = "/dashboard" }: Props
     if (!clerk.client) return;
     await clerk.client.signIn.authenticateWithRedirect({
       strategy: "oauth_github",
-      redirectUrl: "/sso-callback",
+      redirectUrl: "/sso-callback?provider=github",
       redirectUrlComplete,
     });
   };

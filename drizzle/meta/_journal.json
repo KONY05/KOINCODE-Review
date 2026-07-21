@@ -92,6 +92,13 @@
       "when": 1784299467512,
       "tag": "0012_add-azure-devops-provider",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784310000000,
+      "tag": "0013_rename-github-username-to-git-username",
+      "breakpoints": true
     }
   ]
 }

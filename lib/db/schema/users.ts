@@ -12,7 +12,11 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
-  githubUsername: text("github_username"),
+  // The username from whichever git provider the account first signed up
+  // with (GitHub, GitLab, or Azure DevOps/Microsoft) — not GitHub-specific
+  // despite the column's history. Populated once, at signup, and never
+  // updated afterward even if more providers get linked later.
+  gitUsername: text("git_username"),
   hasCompletedOnboarding: boolean("has_completed_onboarding")
     .notNull()
     .default(false),

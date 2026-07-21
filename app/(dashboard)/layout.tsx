@@ -23,7 +23,7 @@ export default async function DashboardLayout({
     name: dbUser.name,
     email: dbUser.email,
     avatarUrl: dbUser.avatarUrl,
-    githubUsername: dbUser.githubUsername,
+    gitUsername: dbUser.gitUsername,
   };
 
   return (
@@ -31,7 +31,7 @@ export default async function DashboardLayout({
       id: dbUser.id,
       email: dbUser.email,
       name: dbUser.name ?? "",
-      githubUsername: dbUser.githubUsername ?? "",
+      gitUsername: dbUser.gitUsername ?? "",
     }}>
       <TooltipProvider>
         <SidebarProvider>
