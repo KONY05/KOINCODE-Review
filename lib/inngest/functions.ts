@@ -1,4 +1,4 @@
-import { eq, and, lt, asc, count } from "drizzle-orm";
+import { eq, and, lt, asc, desc, count } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 
@@ -407,6 +407,19 @@ export const processReview = inngest.createFunction(
             )
           );
 
+        const [previousReview] = await db
+          .select({ summary: reviews.summary, comments: reviews.comments })
+          .from(reviews)
+          .where(
+            and(
+              eq(reviews.repoId, repoId),
+              eq(reviews.prNumber, prNumber),
+              eq(reviews.status, "completed")
+            )
+          )
+          .orderBy(desc(reviews.createdAt))
+          .limit(1);
+
         let codebaseContext: { filePath: string; text: string }[] = [];
         const googleApiKey = config.googleEncryptedKey
           ? decrypt(config.googleEncryptedKey)
@@ -457,6 +470,18 @@ export const processReview = inngest.createFunction(
             fileContents: new Map(fileContents),
             diff,
             repoMemories: memories.map((m) => m.rule),
+            previousReview:
+              previousReview && previousReview.summary && previousReview.comments
+                ? {
+                    summary: previousReview.summary,
+                    comments: previousReview.comments.map((c) => ({
+                      path: c.path,
+                      line: c.line,
+                      body: c.body,
+                      status: c.status,
+                    })),
+                  }
+                : undefined,
           });
 
           await logKeyUsage({

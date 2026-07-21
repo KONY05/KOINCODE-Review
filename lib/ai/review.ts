@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 
 import { createLLMProvider } from "./providers";
 import { REVIEW_SYSTEM_PROMPT, buildReviewPrompt } from "./prompts";
+import type { PromptParams } from "./prompts";
 import type { LlmProvider } from "@/lib/db/schema/api-keys";
 
 const walkthroughEntrySchema = z.object({
@@ -49,33 +50,16 @@ export type ReviewResult = {
   durationMs: number;
 };
 
-type RunReviewParams = {
+type RunReviewParams = PromptParams & {
   provider: LlmProvider;
   model: string;
   apiKey: string;
-  prTitle: string;
-  headBranch: string;
-  baseBranch: string;
-  filesChanged: number;
-  codebaseContext: { filePath: string; text: string }[];
-  fileContents: Map<string, string>;
-  diff: string;
-  repoMemories?: string[];
 };
 
 export async function runReview(params: RunReviewParams): Promise<ReviewResult> {
   const llmProvider = createLLMProvider(params.provider, params.apiKey);
 
-  const userPrompt = buildReviewPrompt({
-    prTitle: params.prTitle,
-    headBranch: params.headBranch,
-    baseBranch: params.baseBranch,
-    filesChanged: params.filesChanged,
-    codebaseContext: params.codebaseContext,
-    fileContents: params.fileContents,
-    diff: params.diff,
-    repoMemories: params.repoMemories,
-  });
+  const userPrompt = buildReviewPrompt(params);
 
   const startTime = Date.now();
 
