@@ -23,6 +23,7 @@ function formatTimestamp(iso: string) {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "UTC",
   });
 }
 
@@ -63,7 +64,7 @@ export const columns = [
   columnHelper.accessor("repoFullName", {
     header: "Repo",
     cell: (info) => (
-      <span className="max-w-[180px] truncate block">
+      <span className="max-w-45 truncate block">
         {info.getValue() ?? "—"}
       </span>
     ),
@@ -90,7 +91,7 @@ export const columns = [
     header: () => <span className="block text-right">Tokens</span>,
     cell: ({ row }) => {
       const { inputTokens, outputTokens } = row.original;
-      const total = (inputTokens + outputTokens).toLocaleString();
+      const total = (inputTokens + outputTokens).toLocaleString("en-US");
       return (
         <div className="text-right">
           <Tooltip>
@@ -102,8 +103,8 @@ export const columns = [
               {total}
             </TooltipTrigger>
             <TooltipContent>
-              Input: {inputTokens.toLocaleString()} · Output:{" "}
-              {outputTokens.toLocaleString()}
+              Input: {inputTokens.toLocaleString("en-US")} · Output:{" "}
+              {outputTokens.toLocaleString("en-US")}
             </TooltipContent>
           </Tooltip>
         </div>

@@ -45,7 +45,7 @@ export const metadata: Metadata = {
       "AI-powered code review agent — automated reviews with fix suggestions on every pull request.",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "KOINCODE Review",
     description:
       "AI-powered code review agent — automated reviews with fix suggestions on every pull request.",
