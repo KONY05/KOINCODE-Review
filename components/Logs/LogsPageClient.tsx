@@ -33,7 +33,7 @@ const CARD_DEFS = [
 function formatValue(key: string, value: number) {
   if (key === "successRate") return `${value}%`;
   if (key === "avgDurationMs") return formatDuration(value);
-  return value.toLocaleString();
+  return value.toLocaleString("en-US");
 }
 
 export function LogsPageClient({
@@ -63,13 +63,13 @@ export function LogsPageClient({
         {CARD_DEFS.map((card) => (
           <div
             key={card.key}
-            className="min-w-[200px] shrink-0 rounded-2xl border border-(--kc-border-subtle) bg-card p-5 sm:min-w-0 sm:shrink"
+            className="min-w-50 shrink-0 rounded-2xl border border-(--kc-border-subtle) bg-card p-5 sm:min-w-0 sm:shrink"
           >
             <div className="flex items-start justify-between">
               <span className="text-[13px] font-medium text-(--kc-text-muted)">
                 {card.label}
               </span>
-              <card.icon className="size-[17px] text-(--kc-text-dim)" />
+              <card.icon className="size-4.25 text-(--kc-text-dim)" />
             </div>
             <div className="mt-5 font-mono text-[30px] font-bold">
               {formatValue(card.key, summary[card.key])}

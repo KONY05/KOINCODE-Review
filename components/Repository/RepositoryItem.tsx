@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import type { RepoWithStatus } from "@/lib/actions/repos";
 import { connectRepo, disconnectRepo } from "@/lib/actions/repos";
-import { formatRelativeTime } from "@/lib/utils";
+import { RelativeTime } from "@/components/RelativeTime";
 import { LANGUAGE_COLORS } from "@/lib/constants";
 import { toast } from "sonner";
 
@@ -66,16 +66,18 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
           )}
         </div>
         {repo.description && (
-          <p className="mt-2.5 max-w-[620px] text-[13.5px] text-(--kc-text-secondary)">
+          <p className="mt-2.5 max-w-155 text-[13.5px] text-(--kc-text-secondary)">
             {repo.description}
           </p>
         )}
         <div className="mt-3 flex items-center gap-4 font-mono text-[12.5px] text-(--kc-text-dim)">
           <span className="flex items-center gap-1.5">
-            <StarIcon className="size-[13px] fill-kc-amber stroke-none" />
-            {repo.stargazersCount.toLocaleString()}
+            <StarIcon className="size-3.25 fill-kc-amber stroke-none" />
+            {repo.stargazersCount.toLocaleString("en-US")}
           </span>
-          <span>updated {formatRelativeTime(repo.updatedAt)}</span>
+          <span>
+            updated <RelativeTime dateString={repo.updatedAt} />
+          </span>
         </div>
       </div>
 
@@ -83,7 +85,7 @@ export default function RepositoryItem({ repo }: RepositoryItemProps) {
         href={repo.htmlUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] border border-(--kc-border) text-(--kc-text-muted) transition-colors hover:border-[rgba(255,255,255,0.25)] hover:text-foreground"
+        className="flex size-9.5 shrink-0 items-center justify-center rounded-[10px] border border-(--kc-border) text-(--kc-text-muted) transition-colors hover:border-[rgba(255,255,255,0.25)] hover:text-foreground"
       >
         <ExternalLinkIcon className="size-4" />
       </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 import { ActivityCalendar } from "react-activity-calendar";
 import "react-activity-calendar/tooltips.css";
 import type { Activity } from "react-activity-calendar";
@@ -31,8 +32,9 @@ export default function GithubActivity({
   calendar: ContributionCalendar | null;
 }) {
   const { resolvedTheme } = useTheme();
+  const mounted = useHasMounted();
 
-  if (!calendar || resolvedTheme === undefined) {
+  if (!calendar || !mounted) {
     return (
       <div className="mt-6 rounded-2xl border border-(--kc-border-subtle) bg-card p-7">
         <h3 className="text-[17px] font-semibold">Contribution Activity</h3>
@@ -40,7 +42,7 @@ export default function GithubActivity({
           Visualizing your coding frequency over the last year
         </p>
         <div className="mt-6 flex flex-col items-center gap-4">
-          <Skeleton className="h-[120px] w-full max-w-[700px] rounded-xl" />
+          <Skeleton className="h-30 w-full max-w-175 rounded-xl" />
           {!calendar && (
             <p className="text-[13px] text-(--kc-text-dim)">
               Connect your GitHub account to start tracking activity
@@ -58,7 +60,7 @@ export default function GithubActivity({
     <div className="mt-6 rounded-2xl border border-(--kc-border-subtle) bg-card p-7">
       <h3 className="text-[17px] font-semibold">Contribution Activity</h3>
       <p className="mt-1 text-[13.5px] text-(--kc-text-secondary)">
-        {calendar.totalContributions.toLocaleString()} contributions in the last
+        {calendar.totalContributions.toLocaleString("en-US")} contributions in the last
         year
       </p>
 
@@ -66,6 +68,7 @@ export default function GithubActivity({
         <ActivityCalendar
           data={data}
           colorScheme={colorScheme}
+          showTotalCount={false}
           blockSize={11}
           blockMargin={3}
           blockRadius={2}

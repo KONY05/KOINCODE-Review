@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { formatRelativeTime } from "@/lib/utils";
+import { RelativeTime } from "@/components/RelativeTime";
 import type { ReviewEntry } from "@/lib/actions/reviews";
 
 const STATUS_CONFIG = {
@@ -47,7 +47,7 @@ export default function ReviewItem({ review }: { review: ReviewEntry }) {
     <div className="rounded-2xl border border-(--kc-border-subtle) bg-card p-6 transition-colors hover:border-(--kc-border)">
       <div className="flex items-start gap-3.5">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-(--kc-bg) text-(--kc-text-muted)">
-          <GitPullRequestIcon className="size-[18px]" />
+          <GitPullRequestIcon className="size-4.5" />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -70,7 +70,9 @@ export default function ReviewItem({ review }: { review: ReviewEntry }) {
           </p>
 
           <div className="mt-1 flex items-center gap-3 text-[12px] text-(--kc-text-dim)">
-            <span>{formatRelativeTime(review.createdAt)}</span>
+            <span>
+              <RelativeTime dateString={review.createdAt} />
+            </span>
             {review.model && (
               <>
                 <span>·</span>
