@@ -31,6 +31,7 @@ export type ReviewComment = {
   };
   status: "pending" | "adopted";
   githubCommentId?: number;
+  userReply?: string;
 }
 
 export const reviews = pgTable("reviews", {

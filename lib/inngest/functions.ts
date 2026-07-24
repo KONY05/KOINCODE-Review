@@ -479,6 +479,7 @@ export const processReview = inngest.createFunction(
                       line: c.line,
                       body: c.body,
                       status: c.status,
+                      userReply: c.userReply,
                     })),
                   }
                 : undefined,
@@ -957,15 +958,41 @@ export const processCommentReply = inngest.createFunction(
     const {
       repoId,
       userId,
+      reviewId,
       prNumber,
       repoFullName,
       originalComment,
       userReply,
       replyCommentId,
+      parentCommentId,
       sourceUrl,
     } = event.data;
 
     const [owner, repoName] = repoFullName.split("/");
+
+    await step.run("persist-user-reply", async () => {
+      const [review] = await db
+        .select({ comments: reviews.comments })
+        .from(reviews)
+        .where(eq(reviews.id, reviewId))
+        .limit(1);
+
+      if (!review?.comments) return;
+
+      const matched = review.comments.some(
+        (c) => c.githubCommentId === parentCommentId
+      );
+      if (!matched) return;
+
+      const updatedComments = review.comments.map((c) =>
+        c.githubCommentId === parentCommentId ? { ...c, userReply } : c
+      );
+
+      await db
+        .update(reviews)
+        .set({ comments: updatedComments })
+        .where(eq(reviews.id, reviewId));
+    });
 
     const config = await step.run("load-config", async () => {
       const [user] = await db
@@ -1044,7 +1071,32 @@ export const processCommentReply = inngest.createFunction(
       }
     });
 
-    if (!rule) return { status: "skipped", reason: "not-a-rule" };
+    if (!rule) {
+      await step.run("acknowledge-reply", async () => {
+        try {
+          const client = await clerkClient();
+          const response = await client.users.getUserOauthAccessToken(
+            config.clerkId,
+            "github"
+          );
+          const token = response.data[0]?.token;
+          if (!token) return;
+
+          await replyToComment(
+            token,
+            owner,
+            repoName,
+            prNumber,
+            replyCommentId,
+            "Okay 👍"
+          );
+        } catch (error) {
+          console.error("Failed to post acknowledgment reply:", error);
+        }
+      });
+
+      return { status: "skipped", reason: "not-a-rule" };
+    }
 
     const isDuplicate = await step.run("check-duplicate", async () => {
       const existing = await db

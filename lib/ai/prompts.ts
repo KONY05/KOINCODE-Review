@@ -14,6 +14,7 @@ export type PromptParams = {
       line: number;
       body: string;
       status: "pending" | "adopted";
+      userReply?: string;
     }[];
   };
 };
@@ -118,6 +119,18 @@ Suggestion rules (CRITICAL — the suggestion replaces lines startLine..line ver
 - The suggestion must ONLY replace the targeted lines (startLine..line). Never include code from outside that range — surrounding functions, declarations, or context that already exists in the file must not appear in the suggestion.
 - Match the existing indentation of the code being replaced.`;
 
+function formatPreviousComment(c: {
+  path: string;
+  line: number;
+  body: string;
+  userReply?: string;
+}): string {
+  const base = `- ${c.path}:${c.line} — ${c.body}`;
+  return c.userReply
+    ? `${base}\n  Developer's reply: "${c.userReply}"`
+    : base;
+}
+
 export function buildReviewPrompt(params: PromptParams): string {
   const sections: string[] = [];
 
@@ -147,14 +160,14 @@ export function buildReviewPrompt(params: PromptParams): string {
         `**Previous summary:** ${summary}\n\n` +
         (adopted.length > 0
           ? `**Already fixed (do not re-flag these):**\n` +
-            adopted.map((c) => `- ${c.path}:${c.line} — ${c.body}`).join("\n") +
+            adopted.map((c) => formatPreviousComment(c)).join("\n") +
             `\n\n`
           : "") +
         (pending.length > 0
           ? `**Still open as of the last review (verify against the current diff — only re-flag if genuinely still present):**\n` +
-            pending.map((c) => `- ${c.path}:${c.line} — ${c.body}`).join("\n")
+            pending.map((c) => formatPreviousComment(c)).join("\n")
           : "") +
-        `\n\nGround every finding in the current "Full File Contents" and "Diff" sections below, not in what this previous review suggested. If a pending item above isn't actually present in the code as it exists now, don't restate it or "fix" it — that means it was never applied, not that a related-looking fix is due. Don't re-propose the same idea from a pending item under a different name or framing; if a previously suggested fix wasn't applied, say so plainly rather than re-deriving it as if it were a new finding.`
+        `\n\nGround every finding in the current "Full File Contents" and "Diff" sections below, not in what this previous review suggested. If a pending item above isn't actually present in the code as it exists now, don't restate it or "fix" it — that means it was never applied, not that a related-looking fix is due. Don't re-propose the same idea from a pending item under a different name or framing; if a previously suggested fix wasn't applied, say so plainly rather than re-deriving it as if it were a new finding. If a comment has a "Developer's reply" attached, that's the user directly correcting or pushing back on that specific comment — treat it as authoritative about their codebase, never restate the corrected claim or re-suggest the same fix again in a new form.`
     );
   }
 
