@@ -314,11 +314,13 @@ async function handleReviewComment(payload: ReviewCommentPayload) {
     data: {
       repoId: repo.id,
       userId: repo.userId,
+      reviewId: parentComment.reviewId,
       prNumber: payload.pull_request.number,
       repoFullName: payload.repository.full_name,
       originalComment: parentComment.body,
       userReply: payload.comment.body,
       replyCommentId: payload.comment.id,
+      parentCommentId,
       sourceUrl: payload.comment.html_url,
     },
   });

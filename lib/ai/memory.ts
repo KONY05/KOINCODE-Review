@@ -12,11 +12,15 @@ const EXTRACT_RULE_SYSTEM_PROMPT = `You extract coding rules and preferences fro
 
 Given the original review comment and the developer's reply, extract a single concise rule that should apply to future reviews of this codebase.
 
+This includes two kinds of reply:
+- A stated convention or preference: "we always use X over Y", "ignore X in this context".
+- A factual correction about the codebase that shows the reviewer's suggestion was wrong: "X doesn't exist here", "Y already handles that", "that field isn't available in this theme/config/API". These are just as reusable — future reviews should not repeat a suggestion the developer has already explained is incorrect.
+
 Rules:
 - The rule must be one sentence, under 280 characters.
-- Write it as a directive: "Prefer X over Y", "Always do X", "Never do Y", "Ignore X in Y context".
-- If the reply is not teaching a rule (e.g., just saying "thanks", "fixed", "good catch", or acknowledging the review), return null.
-- If the reply is asking a question rather than stating a preference, return null.`;
+- Write it as a directive: "Prefer X over Y", "Always do X", "Never do Y", "Ignore X in Y context", "Don't suggest X — it doesn't exist/apply here".
+- If the reply is not teaching anything (e.g., just saying "thanks", "fixed", "good catch", or acknowledging the review with no new information), return null.
+- If the reply is asking a question rather than stating a preference or correcting a fact, return null.`;
 
 export type ExtractRuleResult = {
   rule: string | null;
