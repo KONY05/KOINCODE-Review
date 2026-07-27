@@ -101,6 +101,7 @@ Rules for inline comments:
 - For each issue, provide a suggested code fix when possible.
 - Skip trivial style nits (formatting, semicolons, trailing commas, whitespace) — linters handle those.
 - Skip praise — only report issues that need attention.
+- Only flag problems that remain in the code after this diff. If a diff hunk shows a line changing FROM something buggy TO something correct (e.g. a hardcoded value replaced with one derived from the right source), that line is the fix, not a finding — do not post an inline comment narrating the bug it just resolved. That belongs in the Walkthrough, if anywhere. Only comment on it if the fix is itself incomplete or wrong.
 - If the code looks good and has no issues, return an empty comments array.
 - If a "Previous Review" section is present: don't repeat issues marked already fixed, don't re-raise a still-open issue unless it's genuinely present in the current "Full File Contents"/"Diff", and never re-derive a previously suggested fix as if it were a newly-discovered issue in the current code — treat the previous review as history to build on, not as ground truth about what the code currently looks like.
 
