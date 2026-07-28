@@ -1,4 +1,6 @@
 import { CheckIcon } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GitHubSignInButton } from "@/components/github-sign-in-button";
@@ -25,7 +27,7 @@ export default function LandingPage() {
             <br />
             <span className="text-kc-amber">Instantly.</span>
           </h1>
-          <p className="text-(--kc-text-secondary) text-base max-w-[440px] mt-6 leading-relaxed">
+          <p className="text-(--kc-text-secondary) text-base max-w-110 mt-6 leading-relaxed">
             An AI agent reviews every pull request you open — flags bugs,
             suggests fixes, and commits them when you say go. Bring your own
             model.
@@ -45,11 +47,21 @@ export default function LandingPage() {
             </span>
           </div>
         </div>
+        <div className="hidden md:block">
+          <Link href="https://daniellaunches.com" target="_blank">
+            <Image
+              src="https://daniellaunches.com/badge-dark.svg"
+              alt="Featured on DanielLaunches"
+              width="80"
+              height="48"
+            />
+          </Link>
+        </div>
       </div>
 
       {/* Right — Login */}
       <div className="flex items-center justify-center p-10 bg-(--kc-bg)">
-        <div className="w-full max-w-[380px] animate-[kc-pop_0.4s_ease_both]">
+        <div className="w-full max-w-95 animate-[kc-pop_0.4s_ease_both]">
           <h2 className="text-[30px] font-bold tracking-[-0.01em]">
             Welcome back
           </h2>
@@ -75,6 +87,17 @@ export default function LandingPage() {
               request the repo scopes needed to post reviews.
             </span>
           </p>
+
+          <div className="mt-6 md:hidden">
+            <Link href="https://daniellaunches.com" target="_blank">
+              <Image
+                src="https://daniellaunches.com/badge-dark.svg"
+                alt="Featured on DanielLaunches"
+                width="80"
+                height="48"
+              />
+            </Link>
+          </div>
         </div>
       </div>
     </div>
