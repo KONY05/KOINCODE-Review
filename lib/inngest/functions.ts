@@ -20,7 +20,11 @@ import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
 import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/github/diff";
 import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
-import { postReviewComments, replyToComment } from "@/lib/github/comments";
+import {
+  postReviewComments,
+  replyToComment,
+  updatePullRequestDescription,
+} from "@/lib/github/comments";
 import { createCommitStatus } from "@/lib/github/checks";
 import { fetchPushChanges, detectAdoptions } from "@/lib/github/adoption";
 import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
@@ -544,6 +548,20 @@ export const processReview = inngest.createFunction(
       if (!stillActiveBeforePost) {
         return { status: "cancelled", reviewId };
       }
+
+      await step.run("update-pr-description", async () => {
+        try {
+          await updatePullRequestDescription(
+            githubToken,
+            owner,
+            repoName,
+            prNumber,
+            reviewData.response.description
+          );
+        } catch (error) {
+          console.error("Failed to update PR description:", error);
+        }
+      });
 
       const postedComments = await step.run("post-comments", async () => {
         const patches = new Map(Object.entries(reviewData.patches));

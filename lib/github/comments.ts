@@ -300,6 +300,74 @@ export async function postReviewComments(
   return postedComments;
 }
 
+const DESCRIPTION_SUMMARY_START = "<!-- koincode:summary:start -->";
+const DESCRIPTION_SUMMARY_END = "<!-- koincode:summary:end -->";
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildDescriptionSummary(description: string): string {
+  return [
+    DESCRIPTION_SUMMARY_START,
+    `## Summary by KOINCODE`,
+    description,
+    DESCRIPTION_SUMMARY_END,
+  ].join("\n\n");
+}
+
+/**
+ * Injects a "Summary by KOINCODE" section into the PR's own description,
+ * mirroring how CodeRabbit edits the PR body itself rather than only leaving
+ * a separate review comment. Takes the LLM's purpose-built `description`
+ * output (contributor-facing, no review verdict) rather than the review's
+ * `summary` — the two are generated separately so neither has to compromise
+ * on audience/tone, and so this text doesn't just duplicate the review
+ * comment's own summary line.
+ *
+ * The marker comments make this idempotent: a re-review (e.g. on new
+ * commits) replaces the existing section in place instead of appending a
+ * duplicate, and any human-written description text outside the markers is
+ * left untouched.
+ */
+export async function updatePullRequestDescription(
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  description: string
+): Promise<void> {
+  const octokit = new Octokit({ auth: token });
+
+  const { data: pr } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+  const existingBody = pr.body ?? "";
+
+  const summarySection = buildDescriptionSummary(description);
+
+  const markerRegex = new RegExp(
+    `${escapeRegExp(DESCRIPTION_SUMMARY_START)}[\\s\\S]*?${escapeRegExp(DESCRIPTION_SUMMARY_END)}`
+  );
+
+  const newBody = markerRegex.test(existingBody)
+    ? existingBody.replace(markerRegex, summarySection)
+    : existingBody
+      ? `${existingBody}\n\n${summarySection}`
+      : summarySection;
+
+  if (newBody === existingBody) return;
+
+  await octokit.pulls.update({
+    owner,
+    repo,
+    pull_number: prNumber,
+    body: newBody,
+  });
+}
+
 export async function replyToComment(
   token: string,
   owner: string,
