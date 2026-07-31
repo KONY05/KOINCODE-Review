@@ -12,7 +12,16 @@ const walkthroughEntrySchema = z.object({
 });
 
 const reviewResponseSchema = z.object({
-  summary: z.string(),
+  description: z
+    .string()
+    .describe(
+      "A short PR description suitable for the pull request's own description field — what this PR does and why, from the contributor's perspective. No quality assessment or mention of issues found; that belongs in summary."
+    ),
+  summary: z
+    .string()
+    .describe(
+      "A brief 1-3 sentence overview of what this PR does and its overall quality, for the reviewer reading the review — distinct from description."
+    ),
   walkthrough: z.array(walkthroughEntrySchema),
   diagram: z.string().optional(),
   comments: z.array(
