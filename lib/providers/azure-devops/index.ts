@@ -11,6 +11,7 @@ import { fetchPushChanges } from "./adoption";
 
 export const azureDevOpsProvider: GitProvider = {
   id: "azure_devops",
+  supportsNativeSuggestions: false,
   getTokenForClerkUser,
   listUserRepos,
   fetchRepoByFullName,

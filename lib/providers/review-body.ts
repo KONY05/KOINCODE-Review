@@ -57,3 +57,27 @@ export function formatCommentBody(comment: DraftReviewComment): string {
 
   return body;
 }
+
+/**
+ * Renders the suggestion as a colored ```diff fence (red removed / green
+ * added lines) instead of a ```suggestion fence, for providers whose PR
+ * commenting surface doesn't turn ```suggestion into a one-click "Apply
+ * suggestion" button (see GitProvider.supportsNativeSuggestions). GitHub-
+ * flavored Markdown colorizes ```diff fences with no platform-specific
+ * suggestion API involved, which is exactly why this works as a drop-in.
+ */
+export function formatDiffSuggestionBody(comment: DraftReviewComment): string {
+  let body = comment.body;
+
+  if (comment.suggestion != null) {
+    const removed =
+      comment.originalCode != null
+        ? comment.originalCode.split("\n").map((line) => `-${line}`)
+        : [];
+    const added = comment.suggestion.split("\n").map((line) => `+${line}`);
+
+    body += `\n\n\`\`\`diff\n${[...removed, ...added].join("\n")}\n\`\`\``;
+  }
+
+  return body;
+}

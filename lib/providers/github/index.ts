@@ -11,6 +11,7 @@ import { fetchPushChanges } from "./adoption";
 
 export const githubProvider: GitProvider = {
   id: "github",
+  supportsNativeSuggestions: true,
   getTokenForClerkUser,
   listUserRepos,
   fetchRepoByFullName,

@@ -36,6 +36,13 @@ export type DraftReviewComment = {
   line: number;
   body: string;
   suggestion?: string;
+  /**
+   * Lines (startLine ?? line)..line as they existed before `suggestion`,
+   * used only to render a `\`\`\`diff` box on providers where
+   * `!supportsNativeSuggestions`. Undefined when the source line range
+   * couldn't be recovered from the reviewed file's contents.
+   */
+  originalCode?: string;
 };
 
 export type PostedComment = {
@@ -88,6 +95,14 @@ export type CreateWebhookResult =
  */
 export type GitProvider = {
   readonly id: GitProviderId;
+  /**
+   * Whether this provider renders a plain ```suggestion fence as a one-click
+   * "Apply suggestion" button (GitHub, GitLab) or just an inert code block
+   * (Azure DevOps) — gates whether postReviewComments should format
+   * suggestions via formatCommentBody or formatDiffSuggestionBody (see
+   * lib/providers/review-body.ts).
+   */
+  readonly supportsNativeSuggestions: boolean;
 
   getTokenForClerkUser(clerkId: string): Promise<string | null>;
 

@@ -478,8 +478,25 @@ export const processReview = inngest.createFunction(
               .map((f) => [f.filename, f.patch!])
           );
 
+          // Attach the pre-suggestion source lines so non-native-suggestion
+          // providers (Azure DevOps — see Feature 22) can render a colored
+          // diff box; the LLM only ever emits the replacement text. Skipped
+          // for GitHub/GitLab, which never read `originalCode`.
+          const comments = provider.supportsNativeSuggestions
+            ? result.response.comments
+            : result.response.comments.map((c) => {
+                if (c.suggestion == null) return c;
+
+                const lines = fileContents.get(c.path)?.split("\n");
+                const originalCode = lines
+                  ?.slice((c.startLine ?? c.line) - 1, c.line)
+                  .join("\n");
+
+                return { ...c, originalCode };
+              });
+
           return {
-            response: result.response,
+            response: { ...result.response, comments },
             patches,
             reviewedFiles: reviewableFiles,
             reviewSha,

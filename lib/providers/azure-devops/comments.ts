@@ -1,5 +1,5 @@
 import type { DraftReviewComment, PostedComment, ReviewSummary } from "../types";
-import { buildReviewBody, formatCommentBody } from "../review-body";
+import { buildReviewBody, formatDiffSuggestionBody } from "../review-body";
 import { azureFetch, splitOwner } from "./client";
 
 type AzureThread = { id: number };
@@ -12,9 +12,10 @@ type AzureThread = { id: number };
  * - Only anchors on `comment.line` as a single-line rightFileStart/End
  *   position — GitHub's `startLine` (multi-line comments) isn't represented,
  *   same gap as GitLab's implementation.
- * - `formatCommentBody`'s ```suggestion fenced block renders as a plain code
- *   block here, not the one-click "Apply suggestion" button GitHub/GitLab
- *   render it as — Azure DevOps threads have no equivalent affordance.
+ * - Azure DevOps threads render a plain ```suggestion fence as inert code,
+ *   not the one-click "Apply suggestion" button GitHub/GitLab render it as
+ *   (`supportsNativeSuggestions: false`) — so suggestions are formatted via
+ *   `formatDiffSuggestionBody` (see Feature 22) instead of `formatCommentBody`.
  */
 export async function postReviewComments(
   token: string,
@@ -34,7 +35,7 @@ export async function postReviewComments(
   for (const comment of comments) {
     if (!patches.has(comment.path)) continue;
 
-    const body = formatCommentBody(comment);
+    const body = formatDiffSuggestionBody(comment);
     const filePath = comment.path.startsWith("/") ? comment.path : `/${comment.path}`;
 
     try {
