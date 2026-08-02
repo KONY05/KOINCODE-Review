@@ -139,6 +139,17 @@ async function handlePullRequestClosed(payload: PullRequestPayload) {
         repoFullName: payload.repository.full_name,
       },
     });
+  } else {
+    // Dispatched before the no-in-flight-reviews early return below — an
+    // abandoned PR usually has no review running at close time, so gating
+    // this on `cancelled.length` would skip almost every case it exists for.
+    await inngest.send({
+      name: "pr/closed-unmerged",
+      data: {
+        repoId: repo.id,
+        prNumber: payload.number,
+      },
+    });
   }
 
   const summary = payload.pull_request.merged

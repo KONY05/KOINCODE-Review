@@ -54,3 +54,22 @@ export function buildContextQuery(
 ): string {
   return `${prTitle}\n\nChanged files:\n${filePaths.join("\n")}`;
 }
+
+const MAX_DIFF_EXCERPT = 2000;
+
+/**
+ * Query text for semantic related-PR matching. Includes a bounded slice of
+ * the diff on top of the title and file list — embedding input is capped
+ * anyway, and an unbounded diff would push the signal-carrying title and
+ * paths out of the window on a large PR.
+ */
+export function buildRelatedPRQuery(
+  prTitle: string,
+  filePaths: string[],
+  diff: string
+): string {
+  return (
+    `${prTitle}\n\nChanged files:\n${filePaths.join("\n")}\n\n` +
+    `Diff excerpt:\n${diff.slice(0, MAX_DIFF_EXCERPT)}`
+  );
+}

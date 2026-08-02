@@ -19,6 +19,17 @@ import { fetchRepoTree } from "@/lib/github/tree";
 import { indexRepoFiles, indexChangedFiles } from "@/lib/vector/indexing";
 import { deleteNamespace } from "@/lib/vector/client";
 import { fetchPRFiles, fetchPRDiff, fetchPRHeadSha } from "@/lib/github/diff";
+import {
+  fetchRelatedPRGithubCandidates,
+  resolveRelatedPRs,
+} from "@/lib/github/related-prs";
+import type { RelatedPRCandidate } from "@/lib/github/related-prs";
+import {
+  indexReviewedPR,
+  retrieveRelatedPRVectorCandidates,
+  deleteIndexedPR,
+  getPRNamespace,
+} from "@/lib/vector/pr-index";
 import { fetchChangedFileContents, fetchFileContent } from "@/lib/github/files";
 import {
   postReviewComments,
@@ -27,7 +38,11 @@ import {
 } from "@/lib/github/comments";
 import { createCommitStatus } from "@/lib/github/checks";
 import { fetchPushChanges, detectAdoptions } from "@/lib/github/adoption";
-import { retrieveContext, buildContextQuery } from "@/lib/vector/retrieval";
+import {
+  retrieveContext,
+  buildContextQuery,
+  buildRelatedPRQuery,
+} from "@/lib/vector/retrieval";
 import { runReview } from "@/lib/ai/review";
 import { extractRule } from "@/lib/ai/memory";
 import type { ReviewComment } from "@/lib/db/schema/reviews";
@@ -192,11 +207,45 @@ export const cleanupDisconnectedRepos = inngest.createFunction(
       );
 
     for (const repo of staleRepos) {
-      await deleteNamespace(`repo:${repo.id}`);
+      // Both namespaces are absent for a repo that never finished indexing or
+      // was never reviewed, and Pinecone treats deleting a missing namespace
+      // as an error. Swallowed per-repo so one such repo can't abort the purge
+      // for every repo behind it in the loop.
+      for (const namespace of [`repo:${repo.id}`, getPRNamespace(repo.id)]) {
+        try {
+          await deleteNamespace(namespace);
+        } catch (error) {
+          console.error(`Failed to delete namespace ${namespace}:`, error);
+        }
+      }
+
       await db.delete(repos).where(eq(repos.id, repo.id));
     }
 
     return { cleaned: staleRepos.length };
+  }
+);
+
+/**
+ * Drops a PR's vector when it closes without merging, so abandoned work stops
+ * being offered as related context on future PRs. Records are written at
+ * review time, when the PR is necessarily still open and there is no merge
+ * state to filter on — this is the deferred half of that decision.
+ */
+export const removeIndexedPR = inngest.createFunction(
+  {
+    id: "remove-indexed-pr",
+    retries: 2,
+    triggers: [{ event: "pr/closed-unmerged" }],
+  },
+  async ({ event, step }) => {
+    const { repoId, prNumber } = event.data;
+
+    await step.run("delete-pr-vector", async () => {
+      await deleteIndexedPR(repoId, prNumber);
+    });
+
+    return { removed: true, prNumber };
   }
 );
 
@@ -259,6 +308,7 @@ export const processReview = inngest.createFunction(
       userId,
       prNumber,
       prTitle,
+      prUrl,
       headSha,
       headBranch,
       baseBranch,
@@ -459,6 +509,53 @@ export const processReview = inngest.createFunction(
           // non-fatal
         }
 
+        // Semantic match first; GitHub commit history is the fallback for
+        // repos whose PR namespace is still empty (connected before Feature
+        // 20 shipped, or simply not reviewed yet) and for Pinecone failures.
+        let relatedPRCandidates: RelatedPRCandidate[] = [];
+        try {
+          const retrieval = await retrieveRelatedPRVectorCandidates(
+            repoId,
+            buildRelatedPRQuery(prTitle, reviewableFiles, diff),
+            prNumber,
+            googleApiKey
+          );
+          relatedPRCandidates = retrieval.candidates;
+
+          if (googleApiKey && retrieval.usage.tokens > 0) {
+            await logKeyUsage({
+              userId,
+              apiKeyId: config.googleKeyId,
+              repoId,
+              reviewId,
+              action: "embedding",
+              provider: "google",
+              model: EMBEDDING_MODEL,
+              inputTokens: retrieval.usage.tokens,
+              outputTokens: 0,
+              durationMs: retrieval.usage.durationMs,
+              status: "success",
+            });
+          }
+        } catch (error) {
+          console.error("Semantic related-PR retrieval failed:", error);
+        }
+
+        if (relatedPRCandidates.length === 0) {
+          try {
+            relatedPRCandidates = await fetchRelatedPRGithubCandidates(
+              githubToken,
+              owner,
+              repoName,
+              prNumber,
+              baseBranch,
+              reviewableFiles
+            );
+          } catch (error) {
+            console.error("Failed to fetch related PR candidates:", error);
+          }
+        }
+
         const apiKey = decrypt(config.encryptedKey);
 
         try {
@@ -474,6 +571,14 @@ export const processReview = inngest.createFunction(
             fileContents: new Map(fileContents),
             diff,
             repoMemories: memories.map((m) => m.rule),
+            // url is deliberately withheld — the model has no legitimate use
+            // for it and cannot fabricate a link it was never shown.
+            relatedPRCandidates: relatedPRCandidates.map((c) => ({
+              number: c.number,
+              title: c.title,
+              description: c.description,
+              matchedFiles: c.matchedFiles,
+            })),
             previousReview:
               previousReview && previousReview.summary && previousReview.comments
                 ? {
@@ -509,11 +614,30 @@ export const processReview = inngest.createFunction(
               .map((f) => [f.filename, f.patch!])
           );
 
+          // Extracted here rather than downstream because `fileContents` is
+          // in scope only inside this step. Returning the map itself would
+          // put every changed file's full text into the step's persisted
+          // output; slicing first keeps that to a few lines per comment.
+          // Line numbers come from the same numbered file listing the model
+          // was shown, so the slice matches what it was pointing at.
+          const originalCode = result.response.comments.map((c) => {
+            const content = fileContents.get(c.path);
+            if (!content) return undefined;
+
+            const lines = content
+              .split("\n")
+              .slice((c.startLine ?? c.line) - 1, c.line);
+
+            return lines.length > 0 ? lines.join("\n") : undefined;
+          });
+
           return {
+            originalCode,
             response: result.response,
             patches,
             reviewedFiles: reviewableFiles,
             reviewSha,
+            relatedPRCandidates,
           };
         } catch (error) {
           await logKeyUsage({
@@ -549,6 +673,11 @@ export const processReview = inngest.createFunction(
         return { status: "cancelled", reviewId };
       }
 
+      const relatedPRs = resolveRelatedPRs(
+        reviewData.response.relatedPRs ?? [],
+        reviewData.relatedPRCandidates
+      );
+
       await step.run("update-pr-description", async () => {
         try {
           await updatePullRequestDescription(
@@ -563,8 +692,15 @@ export const processReview = inngest.createFunction(
         }
       });
 
-      const postedComments = await step.run("post-comments", async () => {
+      const postResult = await step.run("post-comments", async () => {
         const patches = new Map(Object.entries(reviewData.patches));
+
+        const commentsWithOriginalCode = reviewData.response.comments.map(
+          (c, index) => ({
+            ...c,
+            originalCode: reviewData.originalCode[index] ?? undefined,
+          })
+        );
 
         try {
           return await postReviewComments(
@@ -573,24 +709,32 @@ export const processReview = inngest.createFunction(
             repoName,
             prNumber,
             reviewData.reviewSha,
-            reviewData.response.comments,
+            commentsWithOriginalCode,
             patches,
             {
               summary: reviewData.response.summary,
               walkthrough: reviewData.response.walkthrough,
               diagram: reviewData.response.diagram,
+              relatedPRs,
             }
           );
         } catch (error) {
           console.error("Failed to post review comments to GitHub:", error);
-          return [];
+          return { posted: [], submittedCount: 0, outOfDiffCount: 0 };
         }
       });
 
       await step.run("save-review", async () => {
+        // Keyed on sourceIndex, not array position — comments whose line
+        // couldn't be mapped into the diff are never posted, so a positional
+        // lookup would attach GitHub ids to the wrong comments once anything
+        // is dropped, misrouting later reply/adoption tracking.
+        const githubIdBySource = new Map(
+          postResult.posted.map((p) => [p.sourceIndex, p.githubCommentId])
+        );
+
         const comments: ReviewComment[] =
           reviewData.response.comments.map((c, index) => {
-            const posted = postedComments[index];
             return {
               path: c.path,
               startLine: c.startLine,
@@ -598,7 +742,7 @@ export const processReview = inngest.createFunction(
               body: c.body,
               suggestion: c.suggestion,
               status: "pending" as const,
-              githubCommentId: posted?.githubCommentId,
+              githubCommentId: githubIdBySource.get(index),
             };
           });
 
@@ -614,7 +758,50 @@ export const processReview = inngest.createFunction(
           .where(eq(reviews.id, reviewId));
       });
 
-      const commentCount = reviewData.response.comments.length;
+      await step.run("index-reviewed-pr", async () => {
+        try {
+          const googleApiKey = config.googleEncryptedKey
+            ? decrypt(config.googleEncryptedKey)
+            : undefined;
+
+          const usage = await indexReviewedPR(
+            repoId,
+            {
+              number: prNumber,
+              title: prTitle,
+              url: prUrl,
+              description: reviewData.response.description,
+              walkthrough: reviewData.response.walkthrough,
+            },
+            googleApiKey
+          );
+
+          if (googleApiKey && usage.tokens > 0) {
+            await logKeyUsage({
+              userId,
+              apiKeyId: config.googleKeyId,
+              repoId,
+              reviewId,
+              action: "embedding",
+              provider: "google",
+              model: EMBEDDING_MODEL,
+              inputTokens: usage.tokens,
+              outputTokens: 0,
+              durationMs: usage.durationMs,
+              status: "success",
+            });
+          }
+        } catch (error) {
+          console.error("Failed to index PR for semantic matching:", error);
+        }
+      });
+
+      // What actually landed on the PR, not what the model returned. Comments
+      // whose line can't be mapped into the diff are dropped before posting,
+      // so using the model's raw count made the commit status claim issues
+      // the review body itself reported as none.
+      const commentCount = postResult.submittedCount;
+      const outOfDiffCount = postResult.outOfDiffCount;
 
       await trackServer(EVENTS.REVIEW_COMPLETED, userId, {
         repo_name: repoFullName,
@@ -622,13 +809,28 @@ export const processReview = inngest.createFunction(
         model: config.model,
         provider: config.provider,
         comment_count: commentCount,
+        out_of_diff_count: outOfDiffCount,
       });
 
       await step.run("set-commit-status-success", async () => {
-        const description =
-          commentCount > 0
-            ? `Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`
-            : "No issues found";
+        // Reported side by side, never summed: pre-existing findings are not
+        // this PR's doing, and a single total would read as if they were.
+        // Still surfaced here because the status line is what people see
+        // without opening the review, and staying silent about them would
+        // reintroduce the status-vs-body contradiction in a new place.
+        const parts: string[] = [];
+
+        if (commentCount > 0) {
+          parts.push(`Found ${commentCount} issue${commentCount === 1 ? "" : "s"}`);
+        } else {
+          parts.push(outOfDiffCount > 0 ? "No new issues" : "No issues found");
+        }
+
+        if (outOfDiffCount > 0) {
+          parts.push(`${outOfDiffCount} pre-existing`);
+        }
+
+        const description = parts.join(" · ");
 
         await createCommitStatus(
           githubToken,
@@ -658,7 +860,7 @@ export const processReview = inngest.createFunction(
       return {
         status: "completed",
         reviewId,
-        commentsPosted: postedComments.length,
+        commentsPosted: postResult.posted.length,
       };
     } catch (error) {
       Sentry.captureException(error, {

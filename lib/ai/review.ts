@@ -24,9 +24,32 @@ const reviewResponseSchema = z.object({
     ),
   walkthrough: z.array(walkthroughEntrySchema),
   diagram: z.string().optional(),
+  relatedPRs: z
+    .array(
+      z.object({
+        number: z
+          .number()
+          .describe(
+            "PR number taken verbatim from the 'Possibly Related PRs (candidates)' section. Never invent a number that isn't listed there."
+          ),
+        reason: z
+          .string()
+          .describe(
+            "One sentence on how that PR relates to this one — what it changed that this PR builds on, revisits, or conflicts with."
+          ),
+      })
+    )
+    .describe(
+      "Candidates that are genuinely related to this PR. Return an empty array if none are — do not pad this list."
+    ),
   comments: z.array(
     z.object({
       path: z.string(),
+      scope: z
+        .enum(["diff", "surrounding"])
+        .describe(
+          "\"diff\" if the issue is on a line this PR added or changed. \"surrounding\" if it is pre-existing code the change interacts with but does not itself modify."
+        ),
       startLine: z
         .number()
         .optional()
@@ -45,7 +68,7 @@ const reviewResponseSchema = z.object({
         .string()
         .optional()
         .describe(
-          "Complete replacement for lines startLine..line inclusive, and nothing else. Must contain ONLY the corrected code — never the original code, never both original and fixed, never lines outside startLine..line. Empty string means delete the range entirely. Omit if there's no code fix to suggest."
+          "Complete replacement for lines startLine..line inclusive, and nothing else. Must contain ONLY the corrected code — never the original code, never both original and fixed, never lines outside startLine..line. Must span the same number of lines the range covers unless the fix genuinely adds or removes lines. Never empty or whitespace-only — omit the field entirely if there's no code fix to suggest."
         ),
     })
   ),
