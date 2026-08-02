@@ -1,5 +1,6 @@
 {
   "cSpell.words": [
+    "applyable",
     "BYOK",
     "ciphertext",
     "deepseek",
@@ -8,6 +9,8 @@
     "kimi",
     "KOIN",
     "koincode",
+    "KONY",
+    "mistargeted",
     "moonshotai",
     "nemotron",
     "openrouter",
@@ -16,6 +19,7 @@
     "TOCTOU",
     "unmappable",
     "unsynchronized",
-    "upserted"
+    "upserted",
+    "Upserts"
   ]
 }

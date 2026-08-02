@@ -9,6 +9,7 @@ import {
   indexChangedFilesJob,
   trackAdoption,
   trackAdoptionSummary,
+  removeIndexedPR,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -22,5 +23,6 @@ export const { GET, POST, PUT } = serve({
     indexChangedFilesJob,
     trackAdoption,
     trackAdoptionSummary,
+    removeIndexedPR,
   ],
 });

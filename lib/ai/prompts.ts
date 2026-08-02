@@ -7,6 +7,12 @@ export type PromptParams = {
   fileContents: Map<string, string>;
   diff: string;
   repoMemories?: string[];
+  relatedPRCandidates?: {
+    number: number;
+    title: string;
+    description?: string;
+    matchedFiles?: string[];
+  }[];
   previousReview?: {
     summary: string;
     comments: {
@@ -21,7 +27,7 @@ export type PromptParams = {
 
 export const REVIEW_SYSTEM_PROMPT = `You are an expert code reviewer. You review code in any language — JavaScript, TypeScript, Python, Go, Rust, Java, C#, Ruby, PHP, Swift, Kotlin, and others. Adapt your review to the language, framework, and conventions visible in the code.
 
-Review the pull request diff and produce a structured response with five parts:
+Review the pull request diff and produce a structured response with six parts:
 
 ## 1. Description
 A short PR description suitable for replacing the pull request's own (often empty) description field — 2-4 sentences, or a short bullet list, written from the contributor's perspective: what this PR does and why, in plain language. This is not a code-review verdict — no quality assessment, no "looks good" commentary, no mention of issues found. Just what changed and the motivation, the way a well-written human PR description reads.
@@ -35,7 +41,16 @@ A file-by-file breakdown of the changes. For each changed file, provide the file
 ## 4. Sequence Diagram (optional)
 If the changes involve a multi-step flow (API calls, event handling, data pipelines, request/response cycles), provide a Mermaid sequence diagram visualizing the flow. Use simple labels with no special characters (no quotes, braces, or parentheses in labels). Omit this field entirely if the changes are too simple to warrant a diagram (e.g., a config tweak or single-file refactor).
 
-## 5. Inline Comments
+## 5. Related PRs
+If a "Possibly Related PRs (candidates)" section is present, decide which of those candidates are genuinely related to this PR, and write a one-sentence reason for each.
+
+- Return ONLY numbers listed in that candidates section. Never invent a PR number, and never emit a URL or title — those are filled in from the candidate list, not from your output.
+- A candidate is related if it touched the same feature area, introduced code this PR modifies, or made a decision this PR revisits or contradicts. Shared file paths alone are weak evidence — two unrelated changes often land in the same large file.
+- The reason should say what the relationship IS ("introduces the retry helper this PR extends", "changed the same auth guard in the opposite direction"), not restate the overlap ("also modifies auth.ts").
+- Omit candidates you aren't confident about. An empty array is a correct and common answer — do not pad the list to seem thorough.
+- If no candidates section is present, return an empty array.
+
+## 6. Inline Comments
 Review the diff for issues across these categories. Examples are illustrative — apply the principle to whatever language the code is in.
 
 ### Bugs
@@ -95,11 +110,14 @@ Adapt to the language/framework in the diff:
 ### Surrounding code risks
 Use the full file contents to check code that INTERACTS with the diff. If the changed code calls a function, depends on a variable, or extends a pattern that has a pre-existing bug or vulnerability elsewhere in the same file, flag it. Only flag pre-existing issues when they are directly connected to the changed code — do not audit unrelated parts of the file.
 
+Mark these with "scope": "surrounding". They are reported in a separate section of the review rather than as inline comments, because the lines they point at are not part of this diff and cannot be commented on directly.
+
 ---
 
 IMPORTANT: Do NOT say "no issues found" unless you have carefully checked every changed line against the categories above. A clean-looking PR can still have subtle bugs. Err on the side of flagging potential issues — a false positive is better than a missed bug.
 
 Rules for inline comments:
+- Every comment MUST set "scope". Use "diff" when the problematic line is one this PR added or changed — check the Diff section, not just the file. Use "surrounding" when the problem is in pre-existing code that the change interacts with but does not itself touch. When unsure whether a line is part of the diff, it is not: use "surrounding".
 - Be specific and actionable. Reference exact variable names, function names, and the surrounding context so the reader immediately knows WHERE in the file the issue lives without opening it.
 - For each issue, provide a suggested code fix when possible.
 - Skip trivial style nits (formatting, semicolons, trailing commas, whitespace) — linters handle those.
@@ -116,11 +134,12 @@ Line targeting (CRITICAL — wrong lines will corrupt the code when the suggesti
 
 Suggestion rules (CRITICAL — the suggestion replaces lines startLine..line verbatim):
 - The "suggestion" field must contain the COMPLETE replacement for ALL lines from startLine through line (inclusive). The suggestion is applied by deleting those lines and inserting the suggestion text in their place.
-- Verify: if you mentally delete lines startLine..line from the file and paste the suggestion, the result must be valid code with correct indentation. No orphaned closing braces, no missing function signatures, no leftover old code.
+- Verify by substitution: delete lines startLine..line from the file, paste the suggestion in their place, and check that the RESULTING FILE is valid — no orphaned closing braces, no missing function signatures, no leftover old code. The suggestion itself does NOT need to be valid code standing alone. Replacing a single attribute line inside a JSX element, or one property inside an object literal, with a single line is correct and expected; do not wrap it in its enclosing tag or block to make the snippet look self-contained.
 - NEVER duplicate: the suggestion must contain ONLY the fixed code. Do NOT include the original code followed by the fixed code, or show before/after. One copy of the corrected code only.
-- To suggest DELETING lines, set "suggestion" to an empty string "". Do not re-include surrounding code — empty means "remove these lines entirely."
+- NEVER return an empty or whitespace-only "suggestion". If the fix is to delete code, say so in the comment body and omit "suggestion" entirely — deletions are described in prose, not offered as a one-click action. An empty suggestion is discarded, so returning one just loses your fix.
 - Only include the replacement code itself. No diff markers, no line numbers, no markdown, no comments like "// fixed" or "// changed".
 - The suggestion must ONLY replace the targeted lines (startLine..line). Never include code from outside that range — surrounding functions, declarations, or context that already exists in the file must not appear in the suggestion.
+- The range and the suggestion must describe the SAME span of code, and you control both. A one-line range with a five-line suggestion is always wrong. Fix it in whichever direction is correct: either trim the suggestion down to the lines the range covers, or widen "startLine"/"line" to cover every line the suggestion actually replaces. Count the lines of your suggestion and make the range match before you answer.
 - Match the existing indentation of the code being replaced.`;
 
 function formatPreviousComment(c: {
@@ -150,6 +169,30 @@ export function buildReviewPrompt(params: PromptParams): string {
       `## Repository Rules (learned from past reviews)\n\n` +
         `These are conventions and preferences specific to this codebase. Respect them in your review:\n\n` +
         params.repoMemories.map((rule) => `- ${rule}`).join("\n")
+    );
+  }
+
+  if (params.relatedPRCandidates && params.relatedPRCandidates.length > 0) {
+    const entries = params.relatedPRCandidates.map((candidate) => {
+      const lines = [`### PR #${candidate.number}: ${candidate.title}`];
+
+      if (candidate.matchedFiles && candidate.matchedFiles.length > 0) {
+        lines.push(`Shares changed files: ${candidate.matchedFiles.join(", ")}`);
+      }
+
+      if (candidate.description) {
+        lines.push(candidate.description);
+      }
+      
+      return lines.join("\n");
+    });
+
+    sections.push(
+      `## Possibly Related PRs (candidates)\n\n` +
+        `Previously reviewed PRs in this repository that may relate to this one. ` +
+        `Select only the genuinely related ones for the "relatedPRs" field, using these exact PR numbers, ` +
+        `and write what the relationship is. Returning none of them is a valid answer.\n\n` +
+        entries.join("\n\n")
     );
   }
 
