@@ -97,7 +97,7 @@ export function APIKeyForm({
       <div className="mb-3 mt-6 font-mono text-[11px] tracking-[0.14em] text-(--kc-text-dim)">
         2 · MODEL
       </div>
-      <div className="flex max-h-[140px] md:max-h-[200px] flex-col gap-2 overflow-y-auto">
+      <div className="flex max-h-35 md:max-h-50 flex-col gap-2 overflow-y-auto">
         {currentProvider.models.map((m) => {
           const selected = m === model;
           return (
@@ -139,7 +139,7 @@ export function APIKeyForm({
         />
       </div>
       <p className="mt-2 flex items-center gap-1.5 px-0.5 text-[12px] text-(--kc-text-dim)">
-        <LockIcon className="size-[13px]" />
+        <LockIcon className="size-3.25" />
         Stored encrypted. Used only to request reviews on your behalf.
       </p>
 
@@ -153,7 +153,7 @@ export function APIKeyForm({
             : "cursor-not-allowed disabled:cursor-not-allowed bg-(--kc-surface) text-(--kc-text-dim)"
         }`}
       >
-        <ZapIcon className="size-[17px]" />
+        <ZapIcon className="size-4.25" />
         {isPending ? pendingLabel : submitLabel}
       </button>
     </form>

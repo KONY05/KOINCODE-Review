@@ -12,7 +12,7 @@ export const PROVIDERS: readonly ProviderConfig[] = [
     id: "anthropic",
     label: "Anthropic",
     tag: "Claude",
-    models: ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5","claude-sonnet-4-6"],
+    models: ["claude-fable-5", "claude-opus-5", "claude-sonnet-5","claude-sonnet-4-6"],
   },
   {
     id: "openai",
@@ -25,8 +25,9 @@ export const PROVIDERS: readonly ProviderConfig[] = [
     label: "Google",
     tag: "Gemini",
     models: [
-      "gemini-3-flash-preview",
+      "gemini-3.7-flash",
       "gemini-3.5-flash",
+      "gemini-3-flash-preview",
       "gemini-3.1-pro-preview",
       "gemini-2.5-pro",
       "gemini-2.5-flash",
@@ -37,14 +38,17 @@ export const PROVIDERS: readonly ProviderConfig[] = [
     label: "OpenRouter",
     tag: "Multi",
     models: [
-      "z-ai/glm-5.2",
+      "moonshotai/kimi-k3",
       "moonshotai/kimi-k2.7-code",
-      "qwen/qwen3.7-max",
-      "deepseek/deepseek-v4-pro",
+      "z-ai/glm-5.3-flash",
+      "z-ai/glm-5.2",
+      "qwen/qwen3.8-max",
+      "deepseek/deepseek-v4-pro-0813",
+      "deepseek/deepseek-v4-flash-0731",
       // FREE OPENROUTER MODELS
+      "z-ai/glm-5.2:free",
       "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "google/gemma-4-31b-it:free",
-      "poolside/laguna-xs-2.1:free"
+      "google/gemma-4-31b-it:free"
     ],
   },
 ] as const;

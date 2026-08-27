@@ -205,3 +205,10 @@
     height: 0;
   }
 }
+
+.truncate-select-item > *:first-child {
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
