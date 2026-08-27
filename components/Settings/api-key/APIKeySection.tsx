@@ -11,7 +11,7 @@ export default function APIKeySection({ keys }: { keys: ApiKeyRow[] }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="flex items-center gap-2.5 text-[18px] font-semibold">
-            <KeyIcon className="size-[18px] text-kc-amber" />
+            <KeyIcon className="size-4.5 text-kc-amber" />
             API Keys
           </h3>
           <p className="mt-1.5 text-[13.5px] text-(--kc-text-secondary)">

@@ -1,6 +1,4 @@
 import { CheckIcon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GitHubSignInButton } from "@/components/github-sign-in-button";
@@ -47,16 +45,6 @@ export default function LandingPage() {
             </span>
           </div>
         </div>
-        <div className="hidden md:block">
-          <Link href="https://daniellaunches.com" target="_blank">
-            <Image
-              src="https://daniellaunches.com/badge-dark.svg"
-              alt="Featured on DanielLaunches"
-              width="80"
-              height="48"
-            />
-          </Link>
-        </div>
       </div>
 
       {/* Right — Login */}
@@ -87,17 +75,6 @@ export default function LandingPage() {
               request the repo scopes needed to post reviews.
             </span>
           </p>
-
-          <div className="mt-6 md:hidden">
-            <Link href="https://daniellaunches.com" target="_blank">
-              <Image
-                src="https://daniellaunches.com/badge-dark.svg"
-                alt="Featured on DanielLaunches"
-                width="80"
-                height="48"
-              />
-            </Link>
-          </div>
         </div>
       </div>
     </div>

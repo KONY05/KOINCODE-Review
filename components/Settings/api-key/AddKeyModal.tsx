@@ -34,10 +34,10 @@ export function AddKeyModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="flex cursor-pointer items-center gap-2 rounded-[10px] bg-(--kc-cream) px-4 py-2.5 text-[13.5px] font-semibold text-(--kc-cream-text) transition-colors hover:bg-(--kc-cream-hover)">
-        <PlusIcon className="size-[15px]" />
+        <PlusIcon className="size-3.75" />
         Add Key
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent className="sm:max-w-140">
         <DialogHeader>
           <DialogTitle>Add API Key</DialogTitle>
           <DialogDescription>
